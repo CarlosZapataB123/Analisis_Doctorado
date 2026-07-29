@@ -1,0 +1,1812 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bienestar emocional en la búsqueda de personas desaparecidas — UBPD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root{
+    --bg:#0a0e16;
+    --bg-deep:#060810;
+    --panel:rgba(14,20,32,0.72);
+    --panel-border:rgba(120,150,190,0.16);
+    --line:#25384f;
+    --text:#e7ecf3;
+    --text-dim:#7c8ba0;
+    --text-faint:#4d5a6d;
+    --blue:#4d80ab;
+    --blue-bright:#8ec3ef;
+    --accent:#d99a4e;
+    --accent-dim:#8a6a3f;
+    --risk:#b5654f;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; width:100%; height:100%;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    overflow:hidden;
+    cursor:default;
+  }
+  #canvas-container{ position:fixed; inset:0; }
+  canvas{ display:block; }
+
+  #label-layer{
+    position:fixed; inset:0; pointer-events:none; z-index:5;
+  }
+  .node-label{
+    position:absolute;
+    transform:translate(-50%,-50%);
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px;
+    letter-spacing:0.04em;
+    color:var(--blue-bright);
+    background:rgba(8,12,20,0.55);
+    border:1px solid var(--panel-border);
+    padding:3px 8px;
+    border-radius:2px;
+    white-space:nowrap;
+    opacity:0;
+    transition:opacity .6s ease;
+    backdrop-filter:blur(2px);
+  }
+  .node-label.core-label{
+    font-family:'Space Grotesk',sans-serif;
+    color:var(--accent);
+    font-size:13px;
+    font-weight:600;
+    border-color:rgba(217,154,78,0.35);
+    padding:5px 12px;
+  }
+  .stat-label{
+    position:absolute;
+    transform:translate(-50%,-50%);
+    opacity:0;
+    transition:opacity .6s ease;
+    text-align:center;
+    pointer-events:none;
+  }
+  .stat-label .num{
+    font-family:'JetBrains Mono',monospace;
+    font-size:26px;
+    font-weight:700;
+    color:var(--text);
+    line-height:1;
+    text-shadow:0 2px 18px rgba(0,0,0,0.6);
+  }
+  .stat-label .cap{
+    font-family:'Inter',sans-serif;
+    font-size:10px;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--text-dim);
+    margin-top:4px;
+  }
+
+  /* ---- HUD ---- */
+  .hud{ position:fixed; z-index:10; font-family:'Inter',sans-serif; }
+
+  #topbar{
+    top:0; left:0; right:0;
+    display:flex; justify-content:space-between; align-items:flex-start;
+    padding:28px 40px;
+    pointer-events:none;
+  }
+  #study-title{
+    max-width:520px;
+    pointer-events:auto;
+  }
+  #study-title .eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10.5px;
+    letter-spacing:0.18em;
+    color:var(--text-faint);
+    text-transform:uppercase;
+    margin-bottom:6px;
+  }
+  #study-title h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:15px;
+    font-weight:500;
+    line-height:1.4;
+    color:var(--text-dim);
+    margin:0;
+    letter-spacing:0.01em;
+  }
+  #scene-counter{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    color:var(--text-faint);
+    text-align:right;
+    padding-top:2px;
+  }
+  #scene-counter .current{ color:var(--accent); font-weight:700; }
+
+  /* nav dots — left vertical rail */
+  #nav-rail{
+    top:50%; left:32px; transform:translateY(-50%);
+    display:flex; flex-direction:column; gap:22px;
+    pointer-events:auto;
+  }
+  .nav-dot{
+    display:flex; align-items:center; gap:12px;
+    cursor:pointer;
+    color:var(--text-faint);
+    -webkit-user-select:none; user-select:none;
+  }
+  .nav-dot .dot-mark{
+    width:9px; height:9px; border-radius:50%;
+    border:1.5px solid var(--text-faint);
+    background:transparent;
+    transition:all .35s ease;
+    flex-shrink:0;
+  }
+  .nav-dot .dot-num{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    opacity:0;
+    transform:translateX(-6px);
+    transition:all .35s ease;
+    white-space:nowrap;
+  }
+  .nav-dot:hover .dot-num{ opacity:1; transform:translateX(0); }
+  .nav-dot.active .dot-mark{
+    background:var(--accent); border-color:var(--accent);
+    box-shadow:0 0 10px rgba(217,154,78,0.6);
+  }
+  .nav-dot.active .dot-num{ opacity:1; transform:translateX(0); color:var(--accent); }
+  .nav-dot.disabled{ cursor:default; }
+  .nav-dot.disabled .dot-mark{ border-style:dashed; opacity:0.4; }
+  .nav-dot.disabled:hover .dot-num{ color:var(--text-faint); }
+
+  /* data panel — bottom right */
+  #data-panel{
+    bottom:34px; right:40px; max-width:400px;
+    max-height:62vh; overflow-y:auto;
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:3px;
+    padding:22px 26px;
+    backdrop-filter:blur(10px);
+    pointer-events:auto;
+    transition:opacity .5s ease, transform .5s ease;
+    scrollbar-width:thin;
+    scrollbar-color:var(--line) transparent;
+  }
+  #data-panel::-webkit-scrollbar{ width:5px; }
+  #data-panel::-webkit-scrollbar-thumb{ background:var(--line); border-radius:3px; }
+  #data-panel.fade{ opacity:0; transform:translateY(8px); }
+  #data-panel .panel-eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px; letter-spacing:0.16em; text-transform:uppercase;
+    color:var(--accent); margin-bottom:8px;
+  }
+  #data-panel h2{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:19px; font-weight:600; margin:0 0 10px 0; color:var(--text);
+  }
+  #data-panel p{
+    font-size:12.5px; line-height:1.65; color:var(--text-dim); margin:0 0 6px 0;
+    font-weight:300;
+  }
+  #data-panel .footnote{
+    font-size:10.5px; color:var(--text-faint); margin-top:12px;
+    padding-top:10px; border-top:1px solid var(--line);
+    font-style:italic; line-height:1.5;
+  }
+  #data-panel .mono-row{
+    font-family:'JetBrains Mono',monospace; font-size:11px;
+    color:var(--blue-bright); letter-spacing:0.01em;
+  }
+  #data-panel .factor-list{
+    font-size:12px; line-height:2; color:var(--text);
+  }
+  #data-panel .omega-tag{
+    font-family:'JetBrains Mono',monospace; font-size:10.5px;
+    color:var(--accent); margin-left:6px;
+  }
+  .gallery-tabs{
+    display:flex; flex-wrap:wrap; gap:6px; margin-top:14px;
+  }
+  .gallery-tab{
+    font-family:'JetBrains Mono',monospace; font-size:10px;
+    letter-spacing:0.03em;
+    color:var(--text-dim);
+    border:1px solid var(--line);
+    padding:5px 9px; border-radius:2px;
+    cursor:pointer;
+    transition:all .25s ease;
+  }
+  .gallery-tab:hover{ color:var(--blue-bright); border-color:var(--blue); }
+  .gallery-tab.active{
+    color:var(--accent); border-color:var(--accent);
+    background:rgba(217,154,78,0.08);
+  }
+
+  /* bottom-center hint */
+  #hint{
+    bottom:26px; left:50%; transform:translateX(-50%);
+    font-family:'JetBrains Mono',monospace;
+    font-size:10.5px; color:var(--text-faint);
+    letter-spacing:0.06em;
+    display:flex; gap:18px; align-items:center;
+    pointer-events:none;
+  }
+  #hint kbd{
+    border:1px solid var(--line); border-radius:2px; padding:1px 6px;
+    color:var(--text-dim); font-family:'JetBrains Mono',monospace;
+  }
+
+  #toast{
+    top:50%; left:50%; transform:translate(-50%,-50%) scale(0.96);
+    background:var(--panel); border:1px solid var(--panel-border);
+    padding:14px 24px; border-radius:3px;
+    font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--text-dim);
+    opacity:0; pointer-events:none; transition:all .3s ease;
+    letter-spacing:0.04em;
+  }
+  #toast.show{ opacity:1; transform:translate(-50%,-50%) scale(1); }
+</style>
+</head>
+<body>
+
+<div id="canvas-container"></div>
+<div id="label-layer"></div>
+
+<div class="hud" id="topbar">
+  <div id="study-title">
+    <div class="eyebrow">Tesis doctoral · Ciencias de la Salud · UPNA</div>
+    <h1>Bienestar emocional y psicológico en profesionales de búsqueda de personas desaparecidas — Unidad de Búsqueda de Personas dadas por Desaparecidas (UBPD), Colombia</h1>
+  </div>
+  <div id="scene-counter"><span class="current">01</span> / 07</div>
+</div>
+
+<div class="hud" id="nav-rail"></div>
+
+<div class="hud" id="data-panel"></div>
+
+<div class="hud" id="hint">
+  <span><kbd>&#8592;</kbd> <kbd>&#8594;</kbd> navegar escenas</span>
+  <span><kbd>1</kbd>–<kbd>7</kbd> instrumentos · <kbd>0</kbd> vista general</span>
+  <span>arrastrar para inclinar la vista</span>
+</div>
+
+<div class="hud" id="toast"></div>
+
+<script>
+/* =========================================================================
+   REGLA DE DATOS: esta pieza sólo representa estadísticos agregados
+   (medias, DE, frecuencias, cargas factoriales, índices de ajuste, betas).
+   No se cargan ni simulan registros individuales identificables.
+   ========================================================================= */
+
+const STUDY = {
+  n_total: 220,
+  instruments: [
+    { key:'ryff',   name:'Ryff — Bienestar psicológico' },
+    { key:'cope',   name:'COPE-14 — Afrontamiento' },
+    { key:'apgar',  name:'APGAR familiar' },
+    { key:'mos',    name:'MOS — Apoyo social' },
+    { key:'proqol', name:'ProQOL-vIV — Calidad de vida profesional' },
+    { key:'mbi',    name:'MBI-GS — Burnout' },
+    { key:'iesr',   name:'IES-R — Impacto de evento' },
+  ],
+  sociodemo: {
+    edad: { media:39.3, de:8.4, min:22, max:66 },
+    genero: [
+      { label:'Femenino', n:139 },
+      { label:'Masculino', n:78 },
+      { label:'No binario', n:3 },
+      { label:'Prefiero no responder', n:1 },
+    ],
+    nivel: [
+      { label:'Central', n:41, estimated:true },
+      { label:'Territorial', n:179, estimated:true },
+    ]
+  }
+};
+const GENERO_N_TOTAL = STUDY.sociodemo.genero.reduce((a,g)=>a+g.n,0);
+
+const SCENES = [
+  { id:0, short:'Apertura', enabled:true },
+  { id:1, short:'Perfil sociodemográfico', enabled:true },
+  { id:2, short:'Galería de instrumentos', enabled:true },
+  { id:3, short:'Correlaciones', enabled:true },
+  { id:4, short:'Regresión', enabled:true },
+  { id:5, short:'Modelo SEM', enabled:true },
+  { id:6, short:'Síntesis de hipótesis', enabled:true },
+];
+
+/* ---------------------------------------------------------------------- */
+/* SÍNTESIS DEL CONTRASTE DE HIPÓTESIS                                      */
+/* ---------------------------------------------------------------------- */
+const HYPOTHESIS_DATA = [
+  {
+    id:'h1', num:'H1',
+    text:'Apoyo social y funcionalidad familiar → menos estrés traumático secundario y burnout',
+    verdict:'Apoyada parcialmente', fill:0.55, color:0xd99a4e,
+    evidence:'El apoyo social (MOS) mostró efecto directo e indirecto —vía afrontamiento pasivo— sobre estrés traumático secundario, burnout y bienestar. La funcionalidad familiar (APGAR) perdió significación al controlar por MOS, por varianza compartida entre ambos factores protectores.'
+  },
+  {
+    id:'h2', num:'H2',
+    text:'Los estilos de afrontamiento influyen en el bienestar psicológico',
+    verdict:'Apoyada', fill:0.92, color:0x8ec3ef,
+    evidence:'Afrontamiento pasivo: β=-.36 sobre bienestar; afrontamiento activo: β=.18. El afrontamiento pasivo media el efecto del apoyo social sobre los tres desenlaces (IC bootstrap del efecto indirecto excluyen el cero).'
+  },
+  {
+    id:'h3', num:'H3',
+    text:'La exposición prolongada se asocia con mayor fatiga por compasión',
+    verdict:'Apoyada parcialmente', fill:0.55, color:0xd99a4e,
+    evidence:'Los años de experiencia predicen estrés traumático secundario (β=.14) y burnout (β=.15) tras ajustar por covariables. No predicen bienestar psicológico ni impacto de evento.'
+  },
+  {
+    id:'h4', num:'H4',
+    text:'La edad y los años de experiencia moderan la relación riesgo→bienestar',
+    verdict:'No apoyada', fill:0.16, color:0x5c6f85,
+    evidence:'Las interacciones afrontamiento pasivo × edad y afrontamiento pasivo × experiencia no resultaron significativas (p>.22) en ninguno de los tres desenlaces evaluados.'
+  }
+];
+
+/* ---------------------------------------------------------------------- */
+/* MODELO SEM DE MEDIACIÓN (path analysis, IC 95% bootstrap BCa, 2000 rep.)*/
+/* Apoyo social (MOS) -> Afrontamiento pasivo -> ETS / Burnout / Bienestar */
+/* Ajuste por edad, género y experiencia. n = 189.                        */
+/* ---------------------------------------------------------------------- */
+const SEM_DATA = {
+  n: 189,
+  fit: { chisq:0.161, df:1, p:0.688, cfi:1.000, tli:1.052, rmsea:0.000, srmr:0.005 },
+  a1: { est:-0.207, ci:[-0.356,-0.075], p:0.003 }, // MOS -> afrontamiento pasivo
+  r2_mediator: 0.078,
+  outcomes: {
+    pq_ets: {
+      label:'Estrés traumático secundario', r2:0.399,
+      b:{ est:0.471, ci:[0.338,0.608], p:0.000 },   // pasivo -> desenlace
+      c:{ est:-0.268, ci:[-0.385,-0.162], p:0.000 }, // MOS -> desenlace (directo)
+      ind:{ est:-0.098, ci:[-0.181,-0.034], p:0.008 },
+      tot:{ est:-0.366, ci:[-0.503,-0.251], p:0.000 }
+    },
+    pq_burnout: {
+      label:'Burnout', r2:0.352,
+      b:{ est:0.294, ci:[0.167,0.436], p:0.000 },
+      c:{ est:-0.432, ci:[-0.567,-0.310], p:0.000 },
+      ind:{ est:-0.061, ci:[-0.121,-0.020], p:0.017 },
+      tot:{ est:-0.493, ci:[-0.618,-0.378], p:0.000 }
+    },
+    ryff_total: {
+      label:'Bienestar psicológico', r2:0.377,
+      b:{ est:-0.359, ci:[-0.503,-0.222], p:0.000 },
+      c:{ est:0.409, ci:[0.252,0.572], p:0.000 },
+      ind:{ est:0.074, ci:[0.024,0.145], p:0.017 },
+      tot:{ est:0.483, ci:[0.325,0.656], p:0.000 }
+    }
+  }
+};
+const SEM_OUTCOME_ORDER = ['pq_ets','pq_burnout','ryff_total'];
+
+/* ---------------------------------------------------------------------- */
+/* MODELOS DE REGRESIÓN MÚLTIPLE (β estandarizados, EE robustos HC3)       */
+/* Mismos 10 predictores en los 4 modelos; se omite el intercepto.        */
+/* ---------------------------------------------------------------------- */
+const REG_PREDICTOR_ORDER = ['mos_global','apgar_fam','cope_activo','cope_pasivo','cope_apoyo','exp_entidad','edad','genero_fMasculino','victima_fSi','nivel_fTerritorial'];
+const REG_PRED_LABEL = {
+  mos_global:'Apoyo social (MOS)', apgar_fam:'Funcionalidad familiar',
+  cope_activo:'Afrontamiento activo', cope_pasivo:'Afrontamiento pasivo',
+  cope_apoyo:'Afrontamiento de apoyo', exp_entidad:'Años de experiencia',
+  edad:'Edad', genero_fMasculino:'Género (masculino)',
+  victima_fSi:'Condición de víctima', nivel_fTerritorial:'Nivel territorial'
+};
+function rb(beta,p){ return { beta, sig: p<0.05 }; }
+const REGRESSION_MODELS = {
+  pq_ets: {
+    label:'Estrés traumático secundario (ProQOL)', n:196, r2:0.410,
+    coef:{
+      mos_global:rb(-0.255,0.001), apgar_fam:rb(-0.048,0.521), cope_activo:rb(-0.088,0.143),
+      cope_pasivo:rb(0.432,0.000), cope_apoyo:rb(0.134,0.018), exp_entidad:rb(0.140,0.014),
+      edad:rb(0.023,0.646), genero_fMasculino:rb(-0.149,0.183), victima_fSi:rb(0.110,0.368),
+      nivel_fTerritorial:rb(-0.028,0.843)
+    }
+  },
+  pq_burnout: {
+    label:'Burnout (ProQOL)', n:196, r2:0.378,
+    coef:{
+      mos_global:rb(-0.371,0.000), apgar_fam:rb(-0.044,0.571), cope_activo:rb(-0.168,0.014),
+      cope_pasivo:rb(0.343,0.000), cope_apoyo:rb(0.026,0.702), exp_entidad:rb(0.166,0.006),
+      edad:rb(-0.010,0.872), genero_fMasculino:rb(0.059,0.630), victima_fSi:rb(-0.162,0.184),
+      nivel_fTerritorial:rb(0.062,0.675)
+    }
+  },
+  ryff_total: {
+    label:'Bienestar psicológico (Ryff)', n:189, r2:0.394,
+    coef:{
+      mos_global:rb(0.365,0.000), apgar_fam:rb(0.012,0.892), cope_activo:rb(0.183,0.010),
+      cope_pasivo:rb(-0.389,0.000), cope_apoyo:rb(0.015,0.827), exp_entidad:rb(-0.013,0.820),
+      edad:rb(0.107,0.068), genero_fMasculino:rb(0.024,0.847), victima_fSi:rb(0.071,0.606),
+      nivel_fTerritorial:rb(-0.115,0.405)
+    }
+  },
+  iesr_total: {
+    label:'Impacto de evento (IES-R)', n:188, r2:0.255,
+    coef:{
+      mos_global:rb(-0.307,0.001), apgar_fam:rb(0.041,0.641), cope_activo:rb(-0.011,0.890),
+      cope_pasivo:rb(0.266,0.007), cope_apoyo:rb(0.125,0.058), exp_entidad:rb(0.040,0.523),
+      edad:rb(-0.018,0.789), genero_fMasculino:rb(-0.387,0.002), victima_fSi:rb(0.265,0.073),
+      nivel_fTerritorial:rb(-0.315,0.095)
+    }
+  }
+};
+const REG_MODEL_ORDER = ['pq_ets','pq_burnout','ryff_total','iesr_total'];
+
+/* ---------------------------------------------------------------------- */
+/* MATRIZ DE CORRELACIONES DE SPEARMAN (p ajustada por Holm)               */
+/* Factores de protección/riesgo (predictores) vs. desenlaces psicológicos */
+/* * p<.05  ** p<.01  *** p<.001 — todo agregado, ningún dato individual   */
+/* ---------------------------------------------------------------------- */
+const CORR_ORDER_PRED = ['mos_global','mos_red','apgar_fam','apgar_ami','cope_activo','cope_apoyo','pq_satisf','cope_pasivo','exp_entidad','antiguedad_cargo'];
+const CORR_ORDER_OUT  = ['ryff_total','pq_burnout','pq_ets','mbi_agotam','mbi_cinismo','mbi_eficacia','iesr_total'];
+
+const CORR_LABEL = {
+  mos_global:'Apoyo social (MOS)', mos_red:'Red de apoyo (MOS)',
+  apgar_fam:'Funcionalidad familiar', apgar_ami:'Apoyo de amigos',
+  cope_activo:'Afrontamiento activo', cope_apoyo:'Afrontamiento de apoyo',
+  pq_satisf:'Satisfacción por compasión', cope_pasivo:'Afrontamiento pasivo',
+  exp_entidad:'Años de experiencia', antiguedad_cargo:'Antigüedad en el cargo',
+  ryff_total:'Bienestar psicológico', pq_burnout:'Burnout (ProQOL)',
+  pq_ets:'Estrés traumático secundario', mbi_agotam:'Agotamiento (MBI)',
+  mbi_cinismo:'Cinismo (MBI)', mbi_eficacia:'Eficacia profesional (MBI)',
+  iesr_total:'Impacto de evento (IES-R)'
+};
+const CORR_TYPE = {
+  mos_global:'proteccion', mos_red:'proteccion', apgar_fam:'proteccion', apgar_ami:'proteccion',
+  cope_activo:'proteccion', cope_apoyo:'proteccion', pq_satisf:'proteccion',
+  cope_pasivo:'riesgo', exp_entidad:'riesgo', antiguedad_cargo:'riesgo'
+};
+function cc(r, sig){ return { r, sig }; }
+const CORR_MATRIX = {
+  mos_global:      { ryff_total:cc(.47,1), pq_burnout:cc(-.49,1), pq_ets:cc(-.40,1), mbi_agotam:cc(-.40,1), mbi_cinismo:cc(-.43,1), mbi_eficacia:cc(.21,0), iesr_total:cc(-.30,1) },
+  mos_red:         { ryff_total:cc(.34,1), pq_burnout:cc(-.31,1), pq_ets:cc(-.26,1), mbi_agotam:cc(-.22,1), mbi_cinismo:cc(-.27,1), mbi_eficacia:cc(.02,0), iesr_total:cc(-.23,1) },
+  apgar_fam:       { ryff_total:cc(.41,1), pq_burnout:cc(-.41,1), pq_ets:cc(-.39,1), mbi_agotam:cc(-.34,1), mbi_cinismo:cc(-.34,1), mbi_eficacia:cc(.26,1), iesr_total:cc(-.27,1) },
+  apgar_ami:       { ryff_total:cc(.48,1), pq_burnout:cc(-.43,1), pq_ets:cc(-.26,1), mbi_agotam:cc(-.25,1), mbi_cinismo:cc(-.32,1), mbi_eficacia:cc(.14,0), iesr_total:cc(-.24,1) },
+  cope_activo:     { ryff_total:cc(.23,1), pq_burnout:cc(-.22,1), pq_ets:cc(-.12,0), mbi_agotam:cc(-.13,0), mbi_cinismo:cc(-.22,1), mbi_eficacia:cc(.26,1), iesr_total:cc(-.02,0) },
+  cope_apoyo:      { ryff_total:cc(.04,0), pq_burnout:cc(-.04,0), pq_ets:cc(.19,0), mbi_agotam:cc(.09,0), mbi_cinismo:cc(.07,0), mbi_eficacia:cc(.01,0), iesr_total:cc(.22,1) },
+  pq_satisf:       { ryff_total:cc(.44,1), pq_burnout:cc(-.57,1), pq_ets:cc(-.43,1), mbi_agotam:cc(-.52,1), mbi_cinismo:cc(-.58,1), mbi_eficacia:cc(.54,1), iesr_total:cc(-.35,1) },
+  cope_pasivo:     { ryff_total:cc(-.46,1), pq_burnout:cc(.38,1), pq_ets:cc(.55,1), mbi_agotam:cc(.35,1), mbi_cinismo:cc(.34,1), mbi_eficacia:cc(-.14,0), iesr_total:cc(.44,1) },
+  exp_entidad:     { ryff_total:cc(.04,0), pq_burnout:cc(.16,0), pq_ets:cc(.11,0), mbi_agotam:cc(.25,1), mbi_cinismo:cc(.22,1), mbi_eficacia:cc(.09,0), iesr_total:cc(.05,0) },
+  antiguedad_cargo:{ ryff_total:cc(-.03,0), pq_burnout:cc(.20,0), pq_ets:cc(.05,0), mbi_agotam:cc(.20,0), mbi_cinismo:cc(.21,1), mbi_eficacia:cc(.07,0), iesr_total:cc(.05,0) },
+};
+
+/* ---------------------------------------------------------------------- */
+/* DATOS PSICOMÉTRICOS POR INSTRUMENTO (Plan_Analisis_Doctorado_UPNA.Rmd)  */
+/* Todos agregados: n de casos completos, índices de ajuste del modelo    */
+/* final, fiabilidad omega por factor, rango de cargas estandarizadas.    */
+/* ---------------------------------------------------------------------- */
+const INSTRUMENT_DETAIL = {
+  ryff: {
+    label:'Ryff', full:'Ryff — Bienestar psicológico', n:209,
+    modelName:'6 factores',
+    fit:{ chi2:499.12, gl:194, cfi:0.907, tli:0.889, rmsea:0.087, rmseaCI:'[0.078, 0.096]', srmr:0.094, cargaMin:0.395, cargaMax:0.861 },
+    factors:[
+      { name:'autoaceptación', omega:0.679 },
+      { name:'relaciones positivas', omega:0.717 },
+      { name:'autonomía', omega:0.545 },
+      { name:'dominio del entorno', omega:0.627 },
+      { name:'propósito vital', omega:0.812 },
+      { name:'crecimiento personal', omega:0.843 },
+    ]
+  },
+  cope: {
+    label:'COPE-14', full:'COPE-14 — Afrontamiento', n:214,
+    modelName:'3 factores',
+    fit:{ chi2:204.29, gl:74, cfi:0.894, tli:0.870, rmsea:0.091, rmseaCI:'[0.076, 0.106]', srmr:0.107, cargaMin:0.523, cargaMax:0.846 },
+    factors:[
+      { name:'apoyo social', omega:0.837 },
+      { name:'afrontamiento pasivo', omega:0.845 },
+      { name:'afrontamiento activo', omega:0.774 },
+    ]
+  },
+  apgar: {
+    label:'APGAR familiar', full:'APGAR familiar', n:217,
+    modelName:'unidimensional',
+    fit:{ chi2:106.26, gl:14, cfi:0.967, tli:0.950, rmsea:0.175, rmseaCI:'[0.145, 0.206]', srmr:0.058, cargaMin:0.709, cargaMax:0.914 },
+    factors:[
+      { name:'funcionalidad familiar', omega:0.934 },
+    ]
+  },
+  proqol: {
+    label:'ProQOL-vIV', full:'ProQOL-vIV — Calidad de vida profesional', n:208,
+    modelName:'3 factores (reducido)',
+    fit:{ chi2:1035.40, gl:321, cfi:0.878, tli:0.867, rmsea:0.104, rmseaCI:'[0.097, 0.111]', srmr:0.103, cargaMin:0.198, cargaMax:0.932 },
+    factors:[
+      { name:'satisfacción por compasión', omega:0.908 },
+      { name:'burnout', omega:0.894 },
+      { name:'estrés traumático secundario', omega:0.876 },
+    ]
+  },
+  mbi: {
+    label:'MBI-GS', full:'MBI-GS — Burnout', n:217,
+    modelName:'3 factores',
+    fit:{ chi2:244.71, gl:101, cfi:0.985, tli:0.982, rmsea:0.081, rmseaCI:'[0.068, 0.094]', srmr:0.058, cargaMin:0.552, cargaMax:0.970 },
+    factors:[
+      { name:'agotamiento', omega:0.947 },
+      { name:'cinismo', omega:0.919 },
+      { name:'eficacia profesional', omega:0.942 },
+    ]
+  },
+  mos: {
+    label:'MOS', full:'MOS — Apoyo social', n:212,
+    modelName:'3 factores',
+    fit:{ chi2:484.25, gl:149, cfi:0.979, tli:0.976, rmsea:0.103, rmseaCI:'[0.093, 0.114]', srmr:0.047, cargaMin:0.747, cargaMax:0.962 },
+    factors:[
+      { name:'apoyo emocional/informacional', omega:0.975 },
+      { name:'apoyo instrumental', omega:0.943 },
+      { name:'interacción social positiva + afectivo', omega:0.965 },
+    ]
+  },
+  iesr: {
+    label:'IES-R', full:'IES-R — Impacto de evento', n:208,
+    modelName:'2 factores',
+    fit:{ chi2:623.70, gl:208, cfi:0.965, tli:0.961, rmsea:0.098, rmseaCI:'[0.089, 0.107]', srmr:0.056, cargaMin:0.620, cargaMax:0.900 },
+    factors:[
+      { name:'intrusión + hiperactivación', omega:0.970 },
+      { name:'evitación', omega:0.929 },
+    ]
+  },
+};
+
+/* ---------------------------------------------------------------------- */
+/* THREE.JS CORE SETUP                                                     */
+/* ---------------------------------------------------------------------- */
+const container = document.getElementById('canvas-container');
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x0a0e16, 1);
+container.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x0a0e16, 0.028);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 200);
+camera.position.set(0, 1.2, 15);
+
+// soft ambient + a couple of point lights for subtle dimensionality
+scene.add(new THREE.AmbientLight(0x8fa8c2, 0.55));
+const keyLight = new THREE.PointLight(0x8ec3ef, 1.1, 60);
+keyLight.position.set(8, 10, 10);
+scene.add(keyLight);
+const warmLight = new THREE.PointLight(0xd99a4e, 0.6, 40);
+warmLight.position.set(-6,-4, 6);
+scene.add(warmLight);
+
+window.addEventListener('resize', ()=>{
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+/* ---------------------------------------------------------------------- */
+/* AMBIENT PARTICLE FIELD (persists across all scenes, very low opacity)  */
+/* ---------------------------------------------------------------------- */
+function buildParticleField(count, spread, color, size, opacity){
+  const geo = new THREE.BufferGeometry();
+  const positions = new Float32Array(count*3);
+  for(let i=0;i<count;i++){
+    positions[i*3]   = (Math.random()-0.5)*spread;
+    positions[i*3+1] = (Math.random()-0.5)*spread*0.6;
+    positions[i*3+2] = (Math.random()-0.5)*spread;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(positions,3));
+  const mat = new THREE.PointsMaterial({
+    color, size, transparent:true, opacity, depthWrite:false,
+    blending:THREE.AdditiveBlending
+  });
+  return new THREE.Points(geo, mat);
+}
+const ambientField = buildParticleField(500, 60, 0x4d80ab, 0.05, 0.35);
+scene.add(ambientField);
+
+/* ---------------------------------------------------------------------- */
+/* HELPERS                                                                 */
+/* ---------------------------------------------------------------------- */
+function makeLineMaterial(color, opacity){
+  return new THREE.LineBasicMaterial({ color, transparent:true, opacity });
+}
+function fadeMaterial(mat, target, duration, onDone){
+  const start = mat.opacity;
+  const t0 = performance.now();
+  function step(){
+    const t = Math.min(1, (performance.now()-t0)/duration);
+    mat.opacity = start + (target-start)*easeInOutCubic(t);
+    if(t<1) requestAnimationFrame(step); else if(onDone) onDone();
+  }
+  requestAnimationFrame(step);
+}
+function easeInOutCubic(t){ return t<0.5 ? 4*t*t*t : 1-Math.pow(-2*t+2,3)/2; }
+
+function project(vec3, camera){
+  const v = vec3.clone().project(camera);
+  return {
+    x: (v.x*0.5+0.5) * window.innerWidth,
+    y: (-v.y*0.5+0.5) * window.innerHeight,
+    behind: v.z > 1
+  };
+}
+
+/* ---------------------------------------------------------------------- */
+/* LABEL LAYER (DOM overlay projected from 3D positions)                  */
+/* Declarado ANTES de construir las escenas: varias escenas llaman a      */
+/* addLabel()/addStatLabel() durante su propia construcción.              */
+/* ---------------------------------------------------------------------- */
+const labelLayer = document.getElementById('label-layer');
+const labels = []; // {el, obj3d, offsetY}
+
+function addLabel(obj3d, html, opts={}){
+  const el = document.createElement('div');
+  el.className = 'node-label' + (opts.core ? ' core-label':'');
+  el.innerHTML = html;
+  labelLayer.appendChild(el);
+  labels.push({ el, obj3d, offsetY: opts.offsetY||0, scene: opts.scene||0 });
+  return el;
+}
+function addStatLabel(obj3d, num, cap, scene){
+  const el = document.createElement('div');
+  el.className = 'stat-label';
+  el.innerHTML = `<div class="num">${num}</div><div class="cap">${cap}</div>`;
+  labelLayer.appendChild(el);
+  labels.push({ el, obj3d, offsetY:0, scene });
+  return el;
+}
+
+/* ---------------------------------------------------------------------- */
+/* SCENE 0 — APERTURA: núcleo n=220 + 7 nodos de instrumentos             */
+/* ---------------------------------------------------------------------- */
+const scene0 = new THREE.Group();
+scene.add(scene0);
+
+const coreGeo = new THREE.IcosahedronGeometry(0.85, 2);
+const coreMat = new THREE.MeshPhongMaterial({
+  color:0xd99a4e, emissive:0x5a3c1a, shininess:40,
+  transparent:true, opacity:1
+});
+const core = new THREE.Mesh(coreGeo, coreMat);
+scene0.add(core);
+
+const coreWire = new THREE.Mesh(
+  new THREE.IcosahedronGeometry(1.05, 1),
+  new THREE.MeshBasicMaterial({ color:0xd99a4e, wireframe:true, transparent:true, opacity:0.18 })
+);
+scene0.add(coreWire);
+
+const instrumentNodes = [];
+const nodeLines = [];
+const NODE_RADIUS = 5.2;
+STUDY.instruments.forEach((inst, i)=>{
+  const angle = (i / STUDY.instruments.length) * Math.PI * 2;
+  const y = Math.sin(i*1.7) * 0.9;
+  const pos = new THREE.Vector3(
+    Math.cos(angle)*NODE_RADIUS,
+    y,
+    Math.sin(angle)*NODE_RADIUS
+  );
+  const nodeGeo = new THREE.SphereGeometry(0.26, 24, 24);
+  const nodeMat = new THREE.MeshPhongMaterial({
+    color:0x4d80ab, emissive:0x14202c, shininess:60,
+    transparent:true, opacity:1
+  });
+  const node = new THREE.Mesh(nodeGeo, nodeMat);
+  node.position.copy(pos);
+  node.userData = { baseY:y, phase:Math.random()*Math.PI*2, inst };
+  scene0.add(node);
+  instrumentNodes.push(node);
+
+  const lineMat = makeLineMaterial(0x4d80ab, 0.28);
+  const lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), pos]);
+  const line = new THREE.Line(lineGeo, lineMat);
+  scene0.add(line);
+  nodeLines.push(line);
+});
+
+/* subtle ring to suggest "structure" beneath the network */
+const ring = new THREE.Mesh(
+  new THREE.RingGeometry(NODE_RADIUS-0.02, NODE_RADIUS, 128),
+  new THREE.MeshBasicMaterial({ color:0x25384f, transparent:true, opacity:0.25, side:THREE.DoubleSide })
+);
+ring.rotation.x = Math.PI/2;
+ring.position.y = -1.6;
+scene0.add(ring);
+
+/* ---------------------------------------------------------------------- */
+/* SCENE 1 — PERFIL SOCIODEMOGRÁFICO                                       */
+/* ---------------------------------------------------------------------- */
+const scene1 = new THREE.Group();
+scene1.visible = false;
+scene.add(scene1);
+
+const GENERO_COLORS = [0x8ec3ef, 0x4d80ab, 0xd99a4e, 0x5c6f85];
+const barGroup = new THREE.Group();
+scene1.add(barGroup);
+
+const BAR_MAX_HEIGHT = 4.2;
+const maxN = Math.max(...STUDY.sociodemo.genero.map(g=>g.n));
+const barWidth = 0.7;
+const barGap = 1.15;
+const startX = -((STUDY.sociodemo.genero.length-1)*barGap)/2;
+
+const genderBars = [];
+STUDY.sociodemo.genero.forEach((g, i)=>{
+  const h = Math.max(0.12, (g.n/maxN) * BAR_MAX_HEIGHT);
+  const geo = new THREE.BoxGeometry(barWidth, 1, barWidth);
+  const mat = new THREE.MeshPhongMaterial({
+    color:GENERO_COLORS[i % GENERO_COLORS.length],
+    transparent:true, opacity:0.88, emissive:0x0a1420, shininess:50
+  });
+  const bar = new THREE.Mesh(geo, mat);
+  bar.scale.y = 0.001; // grows in on enter
+  bar.position.set(startX + i*barGap, -1.8, 0);
+  bar.userData = { targetH:h, data:g };
+  barGroup.add(bar);
+  genderBars.push(bar);
+
+  // thin base plate marker
+  const base = new THREE.Mesh(
+    new THREE.CylinderGeometry(barWidth*0.62, barWidth*0.62, 0.03, 24),
+    new THREE.MeshBasicMaterial({ color:0x25384f, transparent:true, opacity:0.6 })
+  );
+  base.position.set(startX + i*barGap, -1.8, 0);
+  barGroup.add(base);
+});
+
+/* age readout: a slowly rotating arc/dial suggesting range 22–66, mean marked */
+const ageGroup = new THREE.Group();
+ageGroup.position.set(0, 2.55, -1.5);
+scene1.add(ageGroup);
+
+const ageRange = STUDY.sociodemo.edad.max - STUDY.sociodemo.edad.min;
+const ageArcRadius = 2.6;
+const ageArc = new THREE.Mesh(
+  new THREE.TorusGeometry(ageArcRadius, 0.012, 8, 100, Math.PI*1.4),
+  new THREE.MeshBasicMaterial({ color:0x4d80ab, transparent:true, opacity:0.5 })
+);
+ageArc.rotation.z = Math.PI*0.5 + (Math.PI*1.4)/2 * -1;
+ageArc.rotation.x = Math.PI/2;
+ageGroup.add(ageArc);
+
+const meanFrac = (STUDY.sociodemo.edad.media - STUDY.sociodemo.edad.min)/ageRange;
+const meanAngleSpan = Math.PI*1.4;
+const meanAngle = -meanAngleSpan/2 + meanFrac*meanAngleSpan;
+const meanMarker = new THREE.Mesh(
+  new THREE.SphereGeometry(0.09, 16, 16),
+  new THREE.MeshPhongMaterial({ color:0xd99a4e, emissive:0x5a3c1a })
+);
+meanMarker.position.set(Math.cos(meanAngle)*ageArcRadius, 0, Math.sin(meanAngle)*ageArcRadius);
+ageGroup.add(meanMarker);
+
+/* markers scattered lightly to suggest dispersion (DE), abstract not literal */
+for(let i=0;i<14;i++){
+  const t = Math.random();
+  const a = -meanAngleSpan/2 + t*meanAngleSpan;
+  const jitter = (Math.random()-0.5)*0.18;
+  const dot = new THREE.Mesh(
+    new THREE.SphereGeometry(0.028, 8, 8),
+    new THREE.MeshBasicMaterial({ color:0x7c8ba0, transparent:true, opacity:0.55 })
+  );
+  dot.position.set(Math.cos(a)*(ageArcRadius+jitter), 0, Math.sin(a)*(ageArcRadius+jitter));
+  ageGroup.add(dot);
+}
+
+/* nivel Central/Territorial — dona compacta (cifra marcada como estimada) */
+const nivelGroup = new THREE.Group();
+nivelGroup.position.set(3.6, 0.2, -0.6);
+scene1.add(nivelGroup);
+
+const nivelTotal = STUDY.sociodemo.nivel.reduce((a,g)=>a+g.n,0);
+const NIVEL_COLORS = [0xd99a4e, 0x4d80ab];
+let nivelAngleCursor = -Math.PI/2;
+const nivelSegs = [];
+STUDY.sociodemo.nivel.forEach((g,i)=>{
+  const frac = g.n / nivelTotal;
+  const seg = new THREE.Mesh(
+    new THREE.RingGeometry(1.15, 1.5, 48, 1, nivelAngleCursor, frac*Math.PI*2 - 0.04),
+    new THREE.MeshBasicMaterial({ color:NIVEL_COLORS[i%2], transparent:true, opacity:0.85, side:THREE.DoubleSide })
+  );
+  seg.userData = { targetOpacity:0.85 };
+  seg.material.opacity = 0;
+  nivelGroup.add(seg);
+  nivelSegs.push(seg);
+  nivelAngleCursor += frac*Math.PI*2;
+});
+
+addStatLabel(nivelGroup, `${STUDY.sociodemo.nivel[1].n}`, `Territorial (estimado)`, 1);
+const nivelCentralAnchor = new THREE.Object3D();
+nivelCentralAnchor.position.set(3.6, 1.55, -0.6);
+scene1.add(nivelCentralAnchor);
+addStatLabel(nivelCentralAnchor, `${STUDY.sociodemo.nivel[0].n}`, `Central (estimado)`, 1);
+
+/* faded echo of the instrument core, kept in background for continuity */
+const echoCore = new THREE.Mesh(
+  new THREE.IcosahedronGeometry(0.5, 1),
+  new THREE.MeshBasicMaterial({ color:0xd99a4e, wireframe:true, transparent:true, opacity:0.12 })
+);
+echoCore.position.set(0, 0, -9);
+scene1.add(echoCore);
+
+/* ---------------------------------------------------------------------- */
+/* SCENE 2 — GALERÍA DE INSTRUMENTOS                                       */
+/* ---------------------------------------------------------------------- */
+const scene2 = new THREE.Group();
+scene2.visible = false;
+scene.add(scene2);
+
+const INSTRUMENT_ORDER = ['ryff','cope','apgar','proqol','mbi','mos','iesr'];
+const GALLERY_RADIUS = 9;
+const galleryClusters = {}; // key -> { core, factorNodes:[], fitArc, group }
+
+INSTRUMENT_ORDER.forEach((key, i)=>{
+  const detail = INSTRUMENT_DETAIL[key];
+  const angle = (i / INSTRUMENT_ORDER.length) * Math.PI * 2 - Math.PI/2;
+  const clusterPos = new THREE.Vector3(Math.cos(angle)*GALLERY_RADIUS, 0, Math.sin(angle)*GALLERY_RADIUS);
+
+  const clusterGroup = new THREE.Group();
+  clusterGroup.position.copy(clusterPos);
+  clusterGroup.lookAt(0,0,0);
+  scene2.add(clusterGroup);
+
+  // instrument core — size lightly reflects sample n (purely decorative, same order of magnitude)
+  const coreSize = 0.42;
+  const coreG = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(coreSize, 1),
+    new THREE.MeshPhongMaterial({ color:0x4d80ab, emissive:0x101c28, shininess:50, transparent:true, opacity:0.92 })
+  );
+  clusterGroup.add(coreG);
+
+  // fit-quality ring: maps CFI (0.85–1.0 useful band) to arc completeness
+  const cfiFrac = THREE.MathUtils.clamp((detail.fit.cfi - 0.85) / (1.0 - 0.85), 0.08, 1);
+  const fitArc = new THREE.Mesh(
+    new THREE.RingGeometry(coreSize+0.14, coreSize+0.2, 48, 1, -Math.PI/2, cfiFrac*Math.PI*2),
+    new THREE.MeshBasicMaterial({ color:0x8ec3ef, transparent:true, opacity:0.55, side:THREE.DoubleSide })
+  );
+  clusterGroup.add(fitArc);
+
+  // factor sub-nodes orbiting the core; line opacity encodes omega (fiabilidad)
+  const factorNodes = [];
+  const nf = detail.factors.length;
+  detail.factors.forEach((f, j)=>{
+    const fAngle = (j/nf) * Math.PI*2;
+    const fRadius = 1.35;
+    const fPos = new THREE.Vector3(Math.cos(fAngle)*fRadius, Math.sin(fAngle*1.3)*0.5, Math.sin(fAngle)*fRadius*0.6);
+    const size = 0.1 + f.omega*0.09;
+    const fNode = new THREE.Mesh(
+      new THREE.SphereGeometry(size, 16, 16),
+      new THREE.MeshPhongMaterial({ color:0x8ec3ef, emissive:0x0d1620, transparent:true, opacity:0.95 })
+    );
+    fNode.position.copy(fPos);
+    fNode.userData = { basePos:fPos.clone(), phase:Math.random()*Math.PI*2, factor:f };
+    clusterGroup.add(fNode);
+    factorNodes.push(fNode);
+
+    const lineOpacity = THREE.MathUtils.mapLinear(THREE.MathUtils.clamp(f.omega,0.5,0.95), 0.5,0.95, 0.18,0.75);
+    const lineMat = makeLineMaterial(0x4d80ab, lineOpacity);
+    const lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), fPos]);
+    clusterGroup.add(new THREE.Line(lineGeo, lineMat));
+  });
+
+  galleryClusters[key] = { core:coreG, factorNodes, fitArc, group:clusterGroup, detail, index:i };
+
+  addLabel(clusterGroup, detail.label, { offsetY:-1.55, scene:2 });
+});
+
+/* faint connective ring beneath the gallery, echoing scene 0's structure */
+const galleryFloor = new THREE.Mesh(
+  new THREE.RingGeometry(GALLERY_RADIUS-0.015, GALLERY_RADIUS, 128),
+  new THREE.MeshBasicMaterial({ color:0x25384f, transparent:true, opacity:0.22, side:THREE.DoubleSide })
+);
+galleryFloor.rotation.x = Math.PI/2;
+galleryFloor.position.y = -1.4;
+scene2.add(galleryFloor);
+
+const echoCore2 = new THREE.Mesh(
+  new THREE.IcosahedronGeometry(0.4, 1),
+  new THREE.MeshBasicMaterial({ color:0xd99a4e, wireframe:true, transparent:true, opacity:0.14 })
+);
+scene2.add(echoCore2);
+
+let gallerySelected = null; // instrument key or null (wide view)
+
+/* ---------------------------------------------------------------------- */
+/* SCENE 3 — CORRELACIONES: red bipartita predictores ↔ desenlaces         */
+/* ---------------------------------------------------------------------- */
+const scene3 = new THREE.Group();
+scene3.visible = false;
+scene.add(scene3);
+
+const corrNodes = {}; // key -> mesh
+const corrEdges = []; // { line, from, to, r, sig }
+
+function buildCorrColumn(order, xPos, spacing, colorFn){
+  const startY = ((order.length-1)*spacing)/2;
+  order.forEach((key, i)=>{
+    const y = startY - i*spacing;
+    const geo = new THREE.SphereGeometry(0.16, 20, 20);
+    const mat = new THREE.MeshPhongMaterial({
+      color:colorFn(key), emissive:0x0d1620, shininess:50, transparent:true, opacity:0.92
+    });
+    const node = new THREE.Mesh(geo, mat);
+    node.position.set(xPos, y, 0);
+    node.userData = { key };
+    scene3.add(node);
+    corrNodes[key] = node;
+    addLabel(node, CORR_LABEL[key], { offsetY: xPos<0 ? -0.42 : 0.42, scene:3 });
+  });
+}
+
+buildCorrColumn(CORR_ORDER_PRED, -6.6, 0.82, key => CORR_TYPE[key]==='riesgo' ? 0xb5654f : 0x4d80ab);
+buildCorrColumn(CORR_ORDER_OUT,   6.6, 1.05, ()=> 0x8ec3ef);
+
+CORR_ORDER_PRED.forEach(pKey=>{
+  CORR_ORDER_OUT.forEach(oKey=>{
+    const cell = CORR_MATRIX[pKey][oKey];
+    if(!cell.sig) return; // sólo correlaciones significativas (p ajustada por Holm)
+    const from = corrNodes[pKey].position;
+    const to = corrNodes[oKey].position;
+    const absR = Math.abs(cell.r);
+    const opacity = THREE.MathUtils.mapLinear(THREE.MathUtils.clamp(absR,0.2,0.6), 0.2,0.6, 0.12,0.85);
+    const color = cell.r>0 ? 0xb5654f : 0x4d80ab;
+    const lineMat = makeLineMaterial(color, opacity);
+    const lineGeo = new THREE.BufferGeometry().setFromPoints([from, to]);
+    const line = new THREE.Line(lineGeo, lineMat);
+    line.userData.baseOpacity = opacity;
+    scene3.add(line);
+    corrEdges.push({ line, from:pKey, to:oKey, r:cell.r, sig:cell.sig });
+  });
+});
+
+let corrSelected = null; // predictor key or null (vista general)
+
+/* ---------------------------------------------------------------------- */
+/* SCENE 4 — REGRESIÓN: barras de coeficientes beta por modelo             */
+/* ---------------------------------------------------------------------- */
+const scene4 = new THREE.Group();
+scene4.visible = false;
+scene.add(scene4);
+
+const REG_BAR_MAX = 3.2;
+const regBarGroup = new THREE.Group();
+scene4.add(regBarGroup);
+const regBars = {}; // key -> mesh
+const regBarGap = 1.05;
+const regStartX = -((REG_PREDICTOR_ORDER.length-1)*regBarGap)/2;
+
+REG_PREDICTOR_ORDER.forEach((key,i)=>{
+  const geo = new THREE.BoxGeometry(0.55, 1, 0.55);
+  const mat = new THREE.MeshPhongMaterial({ color:0x4d80ab, emissive:0x0a1420, shininess:50, transparent:true, opacity:0.3 });
+  const bar = new THREE.Mesh(geo, mat);
+  bar.position.set(regStartX + i*regBarGap, 0, 0);
+  bar.scale.y = 0.001;
+  bar.userData = { key };
+  regBarGroup.add(bar);
+  regBars[key] = bar;
+  addLabel(bar, REG_PRED_LABEL[key], { offsetY:-0.28, scene:4 });
+});
+
+/* línea base (beta = 0) */
+const regBaseLine = new THREE.Mesh(
+  new THREE.BoxGeometry(REG_PREDICTOR_ORDER.length*regBarGap+0.6, 0.015, 0.015),
+  new THREE.MeshBasicMaterial({ color:0x25384f, transparent:true, opacity:0.6 })
+);
+regBaseLine.position.set(0, -1.6, 0);
+scene4.add(regBaseLine);
+
+let regSelected = 'pq_ets';
+
+/* ---------------------------------------------------------------------- */
+/* SCENE 5 — MODELO SEM: apoyo social → afrontamiento pasivo → desenlaces  */
+/* ---------------------------------------------------------------------- */
+const scene5 = new THREE.Group();
+scene5.visible = false;
+scene.add(scene5);
+
+function semNodeMesh(size, color){
+  return new THREE.Mesh(
+    new THREE.IcosahedronGeometry(size, 1),
+    new THREE.MeshPhongMaterial({ color, emissive:0x0d1620, shininess:50, transparent:true, opacity:0.92 })
+  );
+}
+const semNodes = {};
+semNodes.mos = semNodeMesh(0.34, 0x4d80ab);
+semNodes.mos.position.set(-6.2, 0, 0);
+scene5.add(semNodes.mos);
+addLabel(semNodes.mos, 'Apoyo social (MOS)', { offsetY:-0.55, scene:5 });
+
+semNodes.pasivo = semNodeMesh(0.3, 0xb5654f);
+semNodes.pasivo.position.set(0, 2.1, 0);
+scene5.add(semNodes.pasivo);
+addLabel(semNodes.pasivo, 'Afrontamiento pasivo', { offsetY:-0.6, scene:5 });
+
+const SEM_OUTCOME_Y = { pq_ets:2.6, pq_burnout:0, ryff_total:-2.6 };
+SEM_OUTCOME_ORDER.forEach(key=>{
+  semNodes[key] = semNodeMesh(0.28, 0x8ec3ef);
+  semNodes[key].position.set(6.2, SEM_OUTCOME_Y[key], 0);
+  scene5.add(semNodes[key]);
+  addLabel(semNodes[key], SEM_DATA.outcomes[key].label, { offsetY: key==='ryff_total'?0.6:-0.55, scene:5 });
+});
+
+function semEdgeColorOpacity(est){
+  const color = est>0 ? 0xb5654f : 0x4d80ab;
+  const opacity = THREE.MathUtils.mapLinear(THREE.MathUtils.clamp(Math.abs(est),0.15,0.5), 0.15,0.5, 0.25,0.9);
+  return { color, opacity };
+}
+
+const semEdges = {}; // key -> { line, kind:'b'|'c'|'a1' }
+{
+  const {color,opacity} = semEdgeColorOpacity(SEM_DATA.a1.est);
+  const mat = makeLineMaterial(color, opacity);
+  const geo = new THREE.BufferGeometry().setFromPoints([semNodes.mos.position, semNodes.pasivo.position]);
+  const line = new THREE.Line(geo, mat);
+  line.userData.baseOpacity = opacity;
+  scene5.add(line);
+  semEdges.a1 = { line, kind:'a1' };
+}
+SEM_OUTCOME_ORDER.forEach(key=>{
+  const o = SEM_DATA.outcomes[key];
+  const bStyle = semEdgeColorOpacity(o.b.est);
+  const bMat = makeLineMaterial(bStyle.color, bStyle.opacity);
+  const bGeo = new THREE.BufferGeometry().setFromPoints([semNodes.pasivo.position, semNodes[key].position]);
+  const bLine = new THREE.Line(bGeo, bMat);
+  bLine.userData.baseOpacity = bStyle.opacity;
+  scene5.add(bLine);
+  semEdges['b_'+key] = { line:bLine, kind:'b', outcome:key };
+
+  const cStyle = semEdgeColorOpacity(o.c.est);
+  const cMat = makeLineMaterial(cStyle.color, cStyle.opacity);
+  const cGeo = new THREE.BufferGeometry().setFromPoints([semNodes.mos.position, semNodes[key].position]);
+  const cLine = new THREE.Line(cGeo, cMat);
+  cLine.userData.baseOpacity = cStyle.opacity;
+  scene5.add(cLine);
+  semEdges['c_'+key] = { line:cLine, kind:'c', outcome:key };
+});
+
+let semSelected = null; // outcome key or null (vista general)
+
+/* ---------------------------------------------------------------------- */
+/* SCENE 6 — SÍNTESIS: tablero final de contraste de hipótesis            */
+/* ---------------------------------------------------------------------- */
+const scene6 = new THREE.Group();
+scene6.visible = false;
+scene.add(scene6);
+
+/* el núcleo n=220 reaparece, ahora pleno, como cierre narrativo del recorrido */
+const closingCore = new THREE.Mesh(
+  new THREE.IcosahedronGeometry(0.65, 2),
+  new THREE.MeshPhongMaterial({ color:0xd99a4e, emissive:0x5a3c1a, shininess:40, transparent:true, opacity:0.5 })
+);
+closingCore.position.set(0, 3.4, -4);
+scene6.add(closingCore);
+
+const HYP_GAP = 3.1;
+const hypStartX = -((HYPOTHESIS_DATA.length-1)*HYP_GAP)/2;
+const hypNodes = {}; // id -> { core, arc, group }
+
+HYPOTHESIS_DATA.forEach((h,i)=>{
+  const group = new THREE.Group();
+  group.position.set(hypStartX + i*HYP_GAP, 0, 0);
+  scene6.add(group);
+
+  const core = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(0.46, 1),
+    new THREE.MeshPhongMaterial({ color:h.color, emissive:0x0d1620, shininess:50, transparent:true, opacity:0.9 })
+  );
+  group.add(core);
+
+  const arc = new THREE.Mesh(
+    new THREE.RingGeometry(0.62, 0.7, 48, 1, -Math.PI/2, h.fill*Math.PI*2),
+    new THREE.MeshBasicMaterial({ color:h.color, transparent:true, opacity:0.65, side:THREE.DoubleSide })
+  );
+  group.add(arc);
+
+  /* línea tenue que converge hacia el núcleo de cierre, sugiriendo síntesis */
+  const lineMat = makeLineMaterial(h.color, 0.16);
+  const lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), closingCore.position.clone().sub(group.position)]);
+  group.add(new THREE.Line(lineGeo, lineMat));
+
+  hypNodes[h.id] = { core, arc, group };
+  addLabel(group, h.num, { core:true, offsetY:-0.85, scene:6 });
+});
+
+let hypSelected = null;
+
+function renderRegressionBars(modelKey){
+  const model = REGRESSION_MODELS[modelKey];
+  REG_PREDICTOR_ORDER.forEach((key,i)=>{
+    const bar = regBars[key];
+    const c = model.coef[key];
+    const h = Math.max(0.05, Math.abs(c.beta)/0.5 * REG_BAR_MAX);
+    const t0 = performance.now();
+    const dur = 750;
+    const startScale = bar.scale.y;
+    const startY = bar.position.y;
+    const sign = c.beta>=0 ? 1 : -1;
+    const targetY = -1.6 + sign*(h/2);
+    bar.material.color.set(c.beta>=0 ? 0xb5654f : 0x4d80ab);
+    bar.material.opacity = c.sig ? 0.92 : 0.28;
+    function step(){
+      const t = Math.min(1,(performance.now()-t0)/dur);
+      const e = easeInOutCubic(t);
+      bar.scale.y = startScale + (h-startScale)*e;
+      bar.position.y = startY + (targetY-startY)*e;
+      if(t<1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  });
+}
+
+/* ---------------------------------------------------------------------- */
+/* Llamadas a addLabel()/addStatLabel() para las escenas ya construidas    */
+/* ---------------------------------------------------------------------- */
+addLabel(core, 'n = 220 · UBPD', { core:true, offsetY:-1.5, scene:0 });
+instrumentNodes.forEach(node=>{
+  addLabel(node, node.userData.inst.name, { offsetY:-0.5, scene:0 });
+});
+
+genderBars.forEach(bar=>{
+  addStatLabel(bar, bar.userData.data.n, bar.userData.data.label, 1);
+});
+addStatLabel(meanMarker, STUDY.sociodemo.edad.media.toFixed(1), `Edad media (DE ${STUDY.sociodemo.edad.de})`, 1);
+addLabel(ageGroup, `Rango ${STUDY.sociodemo.edad.min}–${STUDY.sociodemo.edad.max} años`, { offsetY:1.35, scene:1 });
+
+/* ---------------------------------------------------------------------- */
+/* SCENE MANAGEMENT / CAMERA CHOREOGRAPHY                                  */
+/* ---------------------------------------------------------------------- */
+const cameraWaypoints = [
+  { pos:new THREE.Vector3(0, 1.2, 15),   look:new THREE.Vector3(0,0,0) },     // scene 0
+  { pos:new THREE.Vector3(0, 0.4, 10.5), look:new THREE.Vector3(0,0.4,0) },   // scene 1
+  { pos:new THREE.Vector3(0, 5.5, 0.01), look:new THREE.Vector3(0,0,0) },     // scene 2 (vista general, cenital)
+  { pos:new THREE.Vector3(0, 0.5, 17),   look:new THREE.Vector3(0,0,0) },     // scene 3 (vista general de la red)
+  { pos:new THREE.Vector3(0, 0.2, 11),   look:new THREE.Vector3(0,-0.4,0) },  // scene 4 (barras de regresión)
+  { pos:new THREE.Vector3(0, 0.3, 15),   look:new THREE.Vector3(0,0,0) },     // scene 5 (modelo SEM)
+  { pos:new THREE.Vector3(0, 0.6, 12),   look:new THREE.Vector3(0,0.3,0) },   // scene 6 (síntesis de hipótesis)
+];
+
+/* waypoints de foco por instrumento dentro de la escena 3 */
+const galleryFocusWaypoints = {};
+INSTRUMENT_ORDER.forEach(key=>{
+  const c = galleryClusters[key];
+  const dir = c.group.position.clone().normalize();
+  const focusPos = c.group.position.clone().add(dir.clone().multiplyScalar(3.4)).setY(0.6);
+  galleryFocusWaypoints[key] = { pos:focusPos, look:c.group.position.clone() };
+});
+
+let currentScene = 0;
+let transitioning = false;
+const cameraBase = { pos: cameraWaypoints[0].pos.clone(), look: cameraWaypoints[0].look.clone() };
+let cameraLookCurrent = cameraWaypoints[0].look.clone();
+
+function setSceneGroupsVisible(index){
+  scene0.visible = (index===0);
+  scene1.visible = (index===1);
+  scene2.visible = (index===2);
+  scene3.visible = (index===3);
+  scene4.visible = (index===4);
+  scene5.visible = (index===5);
+  scene6.visible = (index===6);
+}
+
+function animateGenderBars(){
+  genderBars.forEach((bar,i)=>{
+    setTimeout(()=>{
+      const t0 = performance.now();
+      const dur = 900;
+      function step(){
+        const t = Math.min(1,(performance.now()-t0)/dur);
+        bar.scale.y = 0.001 + (bar.userData.targetH-0.001)*easeInOutCubic(t);
+        bar.position.y = -1.8 + (bar.scale.y*1)/2 - 0.001;
+        if(t<1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }, i*120);
+  });
+}
+function resetGenderBars(){
+  genderBars.forEach(bar=>{ bar.scale.y = 0.001; bar.position.y = -1.8; });
+  nivelSegs.forEach(seg=>{ seg.material.opacity = 0; });
+}
+function animateNivelDonut(){
+  nivelSegs.forEach((seg,i)=>{
+    setTimeout(()=> fadeMaterial(seg.material, seg.userData.targetOpacity, 700), 300 + i*150);
+  });
+}
+
+function goToScene(index){
+  if(transitioning || index===currentScene) return;
+  const target = SCENES[index];
+  if(!target.enabled){
+    showToast('Escena en construcción — próxima entrega');
+    return;
+  }
+  transitioning = true;
+  const from = currentScene;
+  currentScene = index;
+  updateHUD();
+
+  const panel = document.getElementById('data-panel');
+  panel.classList.add('fade');
+  labels.forEach(l=> l.el.style.opacity = 0 );
+
+  const wp = cameraWaypoints[index];
+  const startPos = cameraBase.pos.clone();
+  const startLook = cameraBase.look.clone();
+  const t0 = performance.now();
+  const dur = 1600;
+
+  // crossfade groups mid-transition
+  let switched = false;
+
+  function step(){
+    const t = Math.min(1, (performance.now()-t0)/dur);
+    const e = easeInOutCubic(t);
+    cameraBase.pos.lerpVectors(startPos, wp.pos, e);
+    cameraBase.look.lerpVectors(startLook, wp.look, e);
+
+    if(t>0.5 && !switched){
+      setSceneGroupsVisible(index);
+      switched = true;
+      if(index===1) { resetGenderBars(); animateGenderBars(); animateNivelDonut(); }
+      if(index===2) { selectInstrument(null, true); }
+      if(index===3) { selectCorrVariable(null, true); }
+      if(index===4) { selectRegModel(regSelected, true); }
+      if(index===5) { selectSemOutcome(null, true); }
+      if(index===6) { selectHypothesis(null, true); }
+    }
+
+    if(t<1){ requestAnimationFrame(step); }
+    else{
+      transitioning = false;
+      renderDataPanel(index);
+      panel.classList.remove('fade');
+    }
+  }
+  requestAnimationFrame(step);
+}
+
+function nextScene(){
+  let i = currentScene+1;
+  while(i<SCENES.length && !SCENES[i].enabled) i++;
+  if(i<SCENES.length) goToScene(i);
+  else showToast('Escena en construcción — próxima entrega');
+}
+function prevScene(){
+  let i = currentScene-1;
+  if(i>=0) goToScene(i);
+}
+
+/* ---------------------------------------------------------------------- */
+/* GALLERY SUB-NAVIGATION (escena 3)                                       */
+/* ---------------------------------------------------------------------- */
+let galleryBusy = false;
+function tweenCamera(targetPos, targetLook, duration){
+  if(galleryBusy) return;
+  galleryBusy = true;
+  const startPos = cameraBase.pos.clone();
+  const startLook = cameraBase.look.clone();
+  const t0 = performance.now();
+  function step(){
+    const t = Math.min(1, (performance.now()-t0)/duration);
+    const e = easeInOutCubic(t);
+    cameraBase.pos.lerpVectors(startPos, targetPos, e);
+    cameraBase.look.lerpVectors(startLook, targetLook, e);
+    if(t<1) requestAnimationFrame(step); else galleryBusy=false;
+  }
+  requestAnimationFrame(step);
+}
+
+function selectInstrument(key, immediate){
+  gallerySelected = key;
+  // reset all cluster highlights
+  INSTRUMENT_ORDER.forEach(k=>{
+    const c = galleryClusters[k];
+    const isSel = (k===key);
+    c.core.material.color.set(isSel ? 0xd99a4e : 0x4d80ab);
+    c.core.material.emissive.set(isSel ? 0x5a3c1a : 0x101c28);
+    c.fitArc.material.color.set(isSel ? 0xd99a4e : 0x8ec3ef);
+  });
+
+  if(key===null){
+    tweenCamera(cameraWaypoints[2].pos, cameraWaypoints[2].look, immediate?10:1200);
+  } else {
+    const wp = galleryFocusWaypoints[key];
+    tweenCamera(wp.pos, wp.look, 1200);
+  }
+  renderGalleryPanel();
+  updateGalleryTabs();
+}
+
+function renderGalleryPanel(){
+  const panel = document.getElementById('data-panel');
+  if(!gallerySelected){
+    panel.innerHTML = `
+      <div class="panel-eyebrow">Escena 03 · Galería de instrumentos</div>
+      <h2>Siete validaciones, un mismo estándar</h2>
+      <p>Cada nodo del anillo es un instrumento con su propio modelo factorial confirmatorio (WLSMV). Selecciona uno para ver sus índices de ajuste y la fiabilidad omega de cada factor.</p>
+      <div id="gallery-tabs" class="gallery-tabs"></div>
+      <div class="footnote">Todos los valores son índices de ajuste y fiabilidad agregados — ningún dato individual.</div>
+    `;
+  } else {
+    const d = INSTRUMENT_DETAIL[gallerySelected];
+    const f = d.fit;
+    panel.innerHTML = `
+      <div class="panel-eyebrow">Escena 03 · ${d.full}</div>
+      <h2>${d.modelName}</h2>
+      <p class="mono-row">CFI ${f.cfi.toFixed(3)} · TLI ${f.tli.toFixed(3)} · RMSEA ${f.rmsea.toFixed(3)} ${f.rmseaCI} · SRMR ${f.srmr.toFixed(3)}</p>
+      <p>Cargas estandarizadas entre ${f.cargaMin.toFixed(2)} y ${f.cargaMax.toFixed(2)}. n = ${d.n} (casos completos).</p>
+      <p class="factor-list">${d.factors.map(fa=>`${fa.name} <span class="omega-tag">ω ${fa.omega.toFixed(3)}</span>`).join('<br>')}</p>
+      <div id="gallery-tabs" class="gallery-tabs"></div>
+      <div class="footnote">Índices de ajuste del modelo factorial final; ω = fiabilidad compuesta (McDonald) por factor.</div>
+    `;
+  }
+  buildGalleryTabsDOM();
+}
+
+function buildGalleryTabsDOM(){
+  const wrap = document.getElementById('gallery-tabs');
+  if(!wrap) return;
+  wrap.innerHTML = '';
+  const overviewTab = document.createElement('div');
+  overviewTab.className = 'gallery-tab' + (!gallerySelected ? ' active' : '');
+  overviewTab.textContent = 'Vista general';
+  overviewTab.addEventListener('click', ()=> selectInstrument(null));
+  wrap.appendChild(overviewTab);
+  INSTRUMENT_ORDER.forEach((key,i)=>{
+    const tab = document.createElement('div');
+    tab.className = 'gallery-tab' + (gallerySelected===key ? ' active':'');
+    tab.textContent = `${i+1} · ${INSTRUMENT_DETAIL[key].label}`;
+    tab.addEventListener('click', ()=> selectInstrument(key));
+    wrap.appendChild(tab);
+  });
+}
+function updateGalleryTabs(){
+  document.querySelectorAll('.gallery-tab').forEach(el=> {});
+}
+
+/* ---------------------------------------------------------------------- */
+/* CORRELATION NETWORK SUB-NAVIGATION (escena 4)                           */
+/* ---------------------------------------------------------------------- */
+function selectCorrVariable(key, immediate){
+  corrSelected = key;
+
+  const connectedOutcomes = key ? CORR_ORDER_OUT.filter(o=> CORR_MATRIX[key][o].sig) : null;
+
+  CORR_ORDER_PRED.forEach(k=>{
+    corrNodes[k].material.opacity = (!key || k===key) ? 0.95 : 0.18;
+  });
+  CORR_ORDER_OUT.forEach(k=>{
+    corrNodes[k].material.opacity = (!key || connectedOutcomes.includes(k)) ? 0.95 : 0.18;
+  });
+  corrEdges.forEach(e=>{
+    const relevant = !key || e.from===key;
+    e.line.material.opacity = relevant ? e.line.userData.baseOpacity : 0.03;
+  });
+
+  if(key===null){
+    tweenCamera(cameraWaypoints[3].pos, cameraWaypoints[3].look, immediate?10:1200);
+  } else {
+    const p = corrNodes[key].position;
+    tweenCamera(new THREE.Vector3(p.x*0.35, p.y*0.5, 13), new THREE.Vector3(0,0,0), 1200);
+  }
+  renderCorrPanel();
+}
+
+function renderCorrPanel(){
+  const panel = document.getElementById('data-panel');
+  if(!corrSelected){
+    // top correlations by |r|, only significant
+    const all = [];
+    CORR_ORDER_PRED.forEach(p=> CORR_ORDER_OUT.forEach(o=>{
+      const c = CORR_MATRIX[p][o];
+      if(c.sig) all.push({ p, o, r:c.r });
+    }));
+    all.sort((a,b)=> Math.abs(b.r)-Math.abs(a.r));
+    const top = all.slice(0,6);
+    panel.innerHTML = `
+      <div class="panel-eyebrow">Escena 04 · Correlaciones</div>
+      <h2>Protección y riesgo frente a los desenlaces</h2>
+      <p>Spearman con p ajustada por Holm. Sólo se dibujan las correlaciones significativas entre los 10 factores de protección/riesgo y los 7 desenlaces.</p>
+      <p class="factor-list">${top.map(t=>`${CORR_LABEL[t.p]} → ${CORR_LABEL[t.o]} <span class="omega-tag" style="color:${t.r>0?'var(--risk)':'var(--blue-bright)'}">r=${t.r.toFixed(2)}</span>`).join('<br>')}</p>
+      <div id="corr-tabs" class="gallery-tabs"></div>
+      <div class="footnote">Azul = correlación negativa · terracota = correlación positiva. Selecciona un predictor para aislar sus asociaciones.</div>
+    `;
+  } else {
+    const key = corrSelected;
+    const rows = CORR_ORDER_OUT.map(o=> ({ o, c:CORR_MATRIX[key][o] })).filter(x=>x.c.sig);
+    rows.sort((a,b)=> Math.abs(b.c.r)-Math.abs(a.c.r));
+    panel.innerHTML = `
+      <div class="panel-eyebrow">Escena 04 · ${CORR_LABEL[key]}</div>
+      <h2>${CORR_TYPE[key]==='riesgo' ? 'Factor de riesgo' : 'Factor de protección'}</h2>
+      <p class="factor-list">${rows.length ? rows.map(x=>`${CORR_LABEL[x.o]} <span class="omega-tag" style="color:${x.c.r>0?'var(--risk)':'var(--blue-bright)'}">r=${x.c.r.toFixed(2)}</span>`).join('<br>') : 'Sin correlaciones significativas tras el ajuste de Holm.'}</p>
+      <div id="corr-tabs" class="gallery-tabs"></div>
+      <div class="footnote">Correlaciones de Spearman significativas (p ajustada por Holm) con los desenlaces.</div>
+    `;
+  }
+  buildCorrTabsDOM();
+}
+
+function buildCorrTabsDOM(){
+  const wrap = document.getElementById('corr-tabs');
+  if(!wrap) return;
+  wrap.innerHTML = '';
+  const overviewTab = document.createElement('div');
+  overviewTab.className = 'gallery-tab' + (!corrSelected ? ' active' : '');
+  overviewTab.textContent = 'Vista general';
+  overviewTab.addEventListener('click', ()=> selectCorrVariable(null));
+  wrap.appendChild(overviewTab);
+  CORR_ORDER_PRED.forEach(key=>{
+    const tab = document.createElement('div');
+    tab.className = 'gallery-tab' + (corrSelected===key ? ' active':'');
+    tab.textContent = CORR_LABEL[key];
+    tab.addEventListener('click', ()=> selectCorrVariable(key));
+    wrap.appendChild(tab);
+  });
+}
+
+/* ---------------------------------------------------------------------- */
+/* REGRESSION MODEL SUB-NAVIGATION (escena 5)                              */
+/* ---------------------------------------------------------------------- */
+function selectRegModel(modelKey, immediate){
+  regSelected = modelKey;
+  renderRegressionBars(modelKey);
+  renderRegPanel();
+  if(!immediate) { /* la cámara ya está en el waypoint de la escena; sin tween adicional */ }
+}
+
+function renderRegPanel(){
+  const panel = document.getElementById('data-panel');
+  const m = REGRESSION_MODELS[regSelected];
+  const rows = REG_PREDICTOR_ORDER
+    .map(key=> ({ key, c:m.coef[key] }))
+    .filter(x=> x.c.sig)
+    .sort((a,b)=> Math.abs(b.c.beta)-Math.abs(a.c.beta));
+  panel.innerHTML = `
+    <div class="panel-eyebrow">Escena 05 · Regresión múltiple</div>
+    <h2>${m.label}</h2>
+    <p class="mono-row">n = ${m.n} · R² ajustado = ${m.r2.toFixed(3)}</p>
+    <p class="factor-list">${rows.map(x=>`${REG_PRED_LABEL[x.key]} <span class="omega-tag" style="color:${x.c.beta>0?'var(--risk)':'var(--blue-bright)'}">β=${x.c.beta.toFixed(2)}</span>`).join('<br>')}</p>
+    <div id="reg-tabs" class="gallery-tabs"></div>
+    <div class="footnote">β estandarizados (EE robustos HC3); sólo predictores con p&lt;.05. Barras atenuadas = no significativo.</div>
+  `;
+  buildRegTabsDOM();
+}
+
+function buildRegTabsDOM(){
+  const wrap = document.getElementById('reg-tabs');
+  if(!wrap) return;
+  wrap.innerHTML = '';
+  REG_MODEL_ORDER.forEach(key=>{
+    const tab = document.createElement('div');
+    tab.className = 'gallery-tab' + (regSelected===key ? ' active':'');
+    tab.textContent = REGRESSION_MODELS[key].label.split(' (')[0];
+    tab.addEventListener('click', ()=> selectRegModel(key));
+    wrap.appendChild(tab);
+  });
+}
+
+/* ---------------------------------------------------------------------- */
+/* SEM MEDIATION MODEL SUB-NAVIGATION (escena 6)                            */
+/* ---------------------------------------------------------------------- */
+function ciStr(ci){ return `[${ci[0].toFixed(2)}, ${ci[1].toFixed(2)}]`; }
+
+function selectSemOutcome(key, immediate){
+  semSelected = key;
+  Object.keys(semEdges).forEach(k=>{
+    const e = semEdges[k];
+    const relevant = !key || e.kind==='a1' || e.outcome===key;
+    e.line.material.opacity = relevant ? e.line.userData.baseOpacity : 0.04;
+  });
+  SEM_OUTCOME_ORDER.forEach(k=>{
+    semNodes[k].material.opacity = (!key || k===key) ? 0.92 : 0.15;
+  });
+  renderSemPanel();
+}
+
+function renderSemPanel(){
+  const panel = document.getElementById('data-panel');
+  if(!semSelected){
+    panel.innerHTML = `
+      <div class="panel-eyebrow">Escena 06 · Modelo de mediación (SEM)</div>
+      <h2>Apoyo social → afrontamiento pasivo → desenlaces</h2>
+      <p class="mono-row">n = ${SEM_DATA.n} · CFI ${SEM_DATA.fit.cfi.toFixed(3)} · RMSEA ${SEM_DATA.fit.rmsea.toFixed(3)} · SRMR ${SEM_DATA.fit.srmr.toFixed(3)}</p>
+      <p>Sendero a (MOS → pasivo): a1=${SEM_DATA.a1.est.toFixed(2)} ${ciStr(SEM_DATA.a1.ci)}. R² del mediador = ${SEM_DATA.r2_mediator.toFixed(3)}.</p>
+      <p>Selecciona un desenlace para ver su efecto indirecto, directo y total con IC bootstrap (BCa, 2000 réplicas).</p>
+      <div id="sem-tabs" class="gallery-tabs"></div>
+      <div class="footnote">Modelo saturado (gl=1); el TLI &gt; 1 es un artefacto conocido en modelos casi saturados, no un problema de ajuste.</div>
+    `;
+  } else {
+    const o = SEM_DATA.outcomes[semSelected];
+    panel.innerHTML = `
+      <div class="panel-eyebrow">Escena 06 · ${o.label}</div>
+      <h2>Vía apoyo social → pasivo → ${o.label.toLowerCase()}</h2>
+      <p class="factor-list">
+        Efecto directo (c) <span class="omega-tag" style="color:${o.c.est>0?'var(--risk)':'var(--blue-bright)'}">${o.c.est.toFixed(2)} ${ciStr(o.c.ci)}</span><br>
+        Pasivo → desenlace (b) <span class="omega-tag" style="color:${o.b.est>0?'var(--risk)':'var(--blue-bright)'}">${o.b.est.toFixed(2)} ${ciStr(o.b.ci)}</span><br>
+        Efecto indirecto (a1×b) <span class="omega-tag" style="color:${o.ind.est>0?'var(--risk)':'var(--blue-bright)'}">${o.ind.est.toFixed(2)} ${ciStr(o.ind.ci)}</span><br>
+        Efecto total <span class="omega-tag" style="color:${o.tot.est>0?'var(--risk)':'var(--blue-bright)'}">${o.tot.est.toFixed(2)} ${ciStr(o.tot.ci)}</span>
+      </p>
+      <p>R² = ${o.r2.toFixed(3)}. Ningún IC del efecto indirecto cruza el cero: la mediación es estadísticamente sólida.</p>
+      <div id="sem-tabs" class="gallery-tabs"></div>
+      <div class="footnote">IC 95% bootstrap BCa (2000 réplicas). Azul = asociación negativa · terracota = positiva.</div>
+    `;
+  }
+  buildSemTabsDOM();
+}
+
+function buildSemTabsDOM(){
+  const wrap = document.getElementById('sem-tabs');
+  if(!wrap) return;
+  wrap.innerHTML = '';
+  const overviewTab = document.createElement('div');
+  overviewTab.className = 'gallery-tab' + (!semSelected ? ' active':'');
+  overviewTab.textContent = 'Vista general';
+  overviewTab.addEventListener('click', ()=> selectSemOutcome(null));
+  wrap.appendChild(overviewTab);
+  SEM_OUTCOME_ORDER.forEach(key=>{
+    const tab = document.createElement('div');
+    tab.className = 'gallery-tab' + (semSelected===key ? ' active':'');
+    tab.textContent = SEM_DATA.outcomes[key].label;
+    tab.addEventListener('click', ()=> selectSemOutcome(key));
+    wrap.appendChild(tab);
+  });
+}
+
+/* ---------------------------------------------------------------------- */
+/* HYPOTHESIS SYNTHESIS SUB-NAVIGATION (escena 7 · cierre)                 */
+/* ---------------------------------------------------------------------- */
+function selectHypothesis(id, immediate){
+  hypSelected = id;
+  HYPOTHESIS_DATA.forEach(h=>{
+    const n = hypNodes[h.id];
+    const dim = id && h.id!==id;
+    n.core.material.opacity = dim ? 0.25 : 0.9;
+    n.arc.material.opacity = dim ? 0.15 : 0.65;
+  });
+  renderHypPanel();
+}
+
+function renderHypPanel(){
+  const panel = document.getElementById('data-panel');
+  if(!hypSelected){
+    panel.innerHTML = `
+      <div class="panel-eyebrow">Escena 07 · Síntesis</div>
+      <h2>Contraste de las cuatro hipótesis</h2>
+      <p class="factor-list">${HYPOTHESIS_DATA.map(h=>`${h.num}: <span class="omega-tag" style="color:#${h.color.toString(16).padStart(6,'0')}">${h.verdict}</span>`).join('<br>')}</p>
+      <p>Selecciona una hipótesis para ver su evidencia completa.</p>
+      <div id="hyp-tabs" class="gallery-tabs"></div>
+      <div class="footnote">Cierra el recorrido por los resultados de la tesis. El anillo de cada nodo es una señal cualitativa del grado de apoyo, no un estadístico.</div>
+    `;
+  } else {
+    const h = HYPOTHESIS_DATA.find(x=>x.id===hypSelected);
+    panel.innerHTML = `
+      <div class="panel-eyebrow">Escena 07 · ${h.num}</div>
+      <h2 style="color:#${h.color.toString(16).padStart(6,'0')}">${h.verdict}</h2>
+      <p>${h.text}</p>
+      <p class="footnote" style="border-top:none;padding-top:0;font-style:normal;color:var(--text-dim)">${h.evidence}</p>
+      <div id="hyp-tabs" class="gallery-tabs"></div>
+    `;
+  }
+  buildHypTabsDOM();
+}
+
+function buildHypTabsDOM(){
+  const wrap = document.getElementById('hyp-tabs');
+  if(!wrap) return;
+  wrap.innerHTML = '';
+  const overviewTab = document.createElement('div');
+  overviewTab.className = 'gallery-tab' + (!hypSelected ? ' active':'');
+  overviewTab.textContent = 'Vista general';
+  overviewTab.addEventListener('click', ()=> selectHypothesis(null));
+  wrap.appendChild(overviewTab);
+  HYPOTHESIS_DATA.forEach(h=>{
+    const tab = document.createElement('div');
+    tab.className = 'gallery-tab' + (hypSelected===h.id ? ' active':'');
+    tab.textContent = h.num;
+    tab.addEventListener('click', ()=> selectHypothesis(h.id));
+    wrap.appendChild(tab);
+  });
+}
+
+/* ---------------------------------------------------------------------- */
+/* HUD RENDERING                                                            */
+/* ---------------------------------------------------------------------- */
+const navRail = document.getElementById('nav-rail');
+SCENES.forEach((s,i)=>{
+  const el = document.createElement('div');
+  el.className = 'nav-dot' + (s.enabled ? '' : ' disabled') + (i===0 ? ' active':'');
+  el.innerHTML = `<span class="dot-mark"></span><span class="dot-num">${String(i+1).padStart(2,'0')} — ${s.short}</span>`;
+  el.addEventListener('click', ()=> goToScene(i));
+  navRail.appendChild(el);
+});
+
+function updateHUD(){
+  document.querySelectorAll('.nav-dot').forEach((el,i)=>{
+    el.classList.toggle('active', i===currentScene);
+  });
+  document.querySelector('#scene-counter .current').textContent = String(currentScene+1).padStart(2,'0');
+}
+
+function renderDataPanel(index){
+  const panel = document.getElementById('data-panel');
+  if(index===0){
+    panel.innerHTML = `
+      <div class="panel-eyebrow">Escena 01 · Apertura</div>
+      <h2>Siete instrumentos, un mismo núcleo</h2>
+      <p>${STUDY.n_total} profesionales de la UBPD respondieron una batería de ${STUDY.instruments.length} instrumentos psicométricos sobre bienestar, afrontamiento, apoyo social, calidad de vida profesional, burnout e impacto del evento.</p>
+      <div class="footnote">Todos los datos representados son estadísticos agregados. No se cargan registros individuales.</div>
+    `;
+  } else if(index===1){
+    panel.innerHTML = `
+      <div class="panel-eyebrow">Escena 02 · Perfil sociodemográfico</div>
+      <h2>¿Quién responde la batería?</h2>
+      <p>Edad media de ${STUDY.sociodemo.edad.media} años (DE = ${STUDY.sociodemo.edad.de}), con un rango entre ${STUDY.sociodemo.edad.min} y ${STUDY.sociodemo.edad.max} años.</p>
+      <p>Distribución por género: ${STUDY.sociodemo.genero.map(g=>`${g.label} (${g.n})`).join(' · ')} — n = ${GENERO_N_TOTAL}.</p>
+      <p>Nivel: Central ≈ ${STUDY.sociodemo.nivel[0].n} · Territorial ≈ ${STUDY.sociodemo.nivel[1].n} <em>(estimado a partir de los n por instrumento; pendiente de confirmar contra la tabla descriptiva completa)</em>.</p>
+      <div class="footnote">Cifras agregadas únicamente. El conteo Central/Territorial es una estimación provisional, no el dato exacto de la muestra completa.</div>
+    `;
+  } else if(index===2){
+    renderGalleryPanel();
+  } else if(index===3){
+    renderCorrPanel();
+  } else if(index===4){
+    renderRegPanel();
+  } else if(index===5){
+    renderSemPanel();
+  } else if(index===6){
+    renderHypPanel();
+  }
+}
+
+let toastTimeout;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(()=> t.classList.remove('show'), 1800);
+}
+
+/* ---------------------------------------------------------------------- */
+/* INPUT: keyboard, click, drag parallax                                  */
+/* ---------------------------------------------------------------------- */
+window.addEventListener('keydown', (e)=>{
+  if(['ArrowRight','ArrowDown','PageDown',' '].includes(e.key)) { nextScene(); }
+  if(['ArrowLeft','ArrowUp','PageUp'].includes(e.key)) { prevScene(); }
+  if(currentScene===2){
+    if(e.key==='0') selectInstrument(null);
+    const n = parseInt(e.key,10);
+    if(n>=1 && n<=7) selectInstrument(INSTRUMENT_ORDER[n-1]);
+  }
+});
+
+let dragging=false, dragStart={x:0,y:0}, dragOffset={x:0,y:0}, dragOffsetTarget={x:0,y:0};
+renderer.domElement.addEventListener('pointerdown', e=>{ dragging=true; dragStart={x:e.clientX,y:e.clientY}; });
+window.addEventListener('pointerup', ()=> dragging=false);
+window.addEventListener('pointermove', e=>{
+  const nx = (e.clientX/window.innerWidth - 0.5);
+  const ny = (e.clientY/window.innerHeight - 0.5);
+  dragOffsetTarget.x = nx * 1.4;
+  dragOffsetTarget.y = ny * 0.8;
+});
+
+/* ---------------------------------------------------------------------- */
+/* MAIN ANIMATION LOOP                                                     */
+/* ---------------------------------------------------------------------- */
+const clock = new THREE.Clock();
+
+function animate(){
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  // ambient field slow drift
+  ambientField.rotation.y = t*0.008;
+
+  // scene0 motion
+  core.rotation.y = t*0.15;
+  core.rotation.x = t*0.06;
+  coreWire.rotation.y = -t*0.1;
+  instrumentNodes.forEach((node,i)=>{
+    const u = node.userData;
+    node.position.y = u.baseY + Math.sin(t*0.6 + u.phase)*0.18;
+    node.rotation.y = t*0.4;
+  });
+  ring.rotation.z = t*0.03;
+
+  // scene1 motion
+  ageGroup.rotation.y = Math.sin(t*0.12)*0.08;
+  nivelGroup.rotation.z = t*0.06;
+  echoCore.rotation.y = t*0.05;
+
+  // scene2 motion — gallery clusters breathe gently, factor nodes orbit softly
+  INSTRUMENT_ORDER.forEach(key=>{
+    const c = galleryClusters[key];
+    c.core.rotation.y = t*0.25;
+    c.fitArc.rotation.z = t*0.04;
+    c.factorNodes.forEach(node=>{
+      const u = node.userData;
+      node.position.y = u.basePos.y + Math.sin(t*0.7+u.phase)*0.08;
+    });
+  });
+  echoCore2.rotation.y = t*0.06;
+  echoCore2.position.set(Math.sin(t*0.05)*1.5, 3.2, Math.cos(t*0.05)*1.5);
+
+  // scene3 motion — gentle depth breathing on nodes
+  CORR_ORDER_PRED.concat(CORR_ORDER_OUT).forEach((key,i)=>{
+    const node = corrNodes[key];
+    node.position.z = Math.sin(t*0.4 + i*0.6) * 0.25;
+  });
+  corrEdges.forEach(e=>{
+    e.line.geometry.setFromPoints([corrNodes[e.from].position, corrNodes[e.to].position]);
+  });
+
+  // scene4 motion — barras de regresión con leve respiración
+  REG_PREDICTOR_ORDER.forEach((key,i)=>{
+    regBars[key].rotation.y = Math.sin(t*0.3+i)*0.04;
+  });
+
+  // scene5 motion — nodos del SEM con leve pulso
+  semNodes.mos.rotation.y = t*0.2;
+  semNodes.pasivo.rotation.y = -t*0.25;
+  SEM_OUTCOME_ORDER.forEach((key,i)=>{ semNodes[key].rotation.y = t*0.2 + i; });
+
+  // scene6 motion — el núcleo de cierre respira suavemente; los nodos de hipótesis giran
+  closingCore.rotation.y = t*0.12;
+  closingCore.scale.setScalar(1 + Math.sin(t*0.5)*0.05);
+  HYPOTHESIS_DATA.forEach((h,i)=>{
+    hypNodes[h.id].core.rotation.y = t*0.3 + i;
+    hypNodes[h.id].arc.rotation.z = t*0.05;
+  });
+
+  // parallax easing
+  dragOffset.x += (dragOffsetTarget.x - dragOffset.x) * 0.04;
+  dragOffset.y += (dragOffsetTarget.y - dragOffset.y) * 0.04;
+
+  // gentle autonomous camera float + parallax, applied on top of cameraBase
+  const floatX = Math.sin(t*0.09) * 0.35;
+  const floatY = Math.sin(t*0.13) * 0.18;
+
+  camera.position.set(
+    cameraBase.pos.x + floatX + dragOffset.x,
+    cameraBase.pos.y + floatY + dragOffset.y,
+    cameraBase.pos.z
+  );
+  cameraLookCurrent.copy(cameraBase.look);
+  camera.lookAt(cameraLookCurrent);
+
+  // project labels to screen space — se ocultan si caen sobre el panel de datos
+  const panelEl = document.getElementById('data-panel');
+  const panelRect = (!panelEl.classList.contains('fade')) ? panelEl.getBoundingClientRect() : null;
+  labels.forEach(l=>{
+    if(l.scene !== currentScene){ l.el.style.opacity = 0; return; }
+    const worldPos = new THREE.Vector3();
+    l.obj3d.getWorldPosition(worldPos);
+    const p = project(worldPos, camera);
+    if(p.behind){ l.el.style.opacity = 0; return; }
+    const labelTop = p.y + (l.offsetY*40);
+    if(panelRect && p.x > panelRect.left-16 && p.x < panelRect.right+16 && labelTop > panelRect.top-16 && labelTop < panelRect.bottom+16){
+      l.el.style.opacity = 0;
+      return;
+    }
+    l.el.style.left = p.x + 'px';
+    l.el.style.top = labelTop + 'px';
+    if(!transitioning) l.el.style.opacity = 1;
+  });
+
+  renderer.render(scene, camera);
+}
+
+/* initial state */
+setSceneGroupsVisible(0);
+renderDataPanel(0);
+updateHUD();
+animate();
+</script>
+</body>
+</html>
