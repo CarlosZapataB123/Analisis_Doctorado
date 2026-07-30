@@ -1,0 +1,2501 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bienestar emocional en la búsqueda de personas desaparecidas — UBPD · Tesis doctoral UPNA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root{
+    --bg:#0a0e16;
+    --bg-deep:#060810;
+    --panel:rgba(13,19,31,0.78);
+    --panel-border:rgba(120,150,190,0.16);
+    --line:#25384f;
+    --text:#e7ecf3;
+    --text-dim:#7c8ba0;
+    --text-faint:#4d5a6d;
+    --blue:#4d80ab;
+    --blue-bright:#8ec3ef;
+    --accent:#d99a4e;
+    --accent-dim:#8a6a3f;
+    --risk:#b5654f;
+    --ok:#8ec3ef;
+    --partial:#7d94ad;
+    --nosup:#48566a;
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0; width:100%; height:100%;
+    background:var(--bg); color:var(--text);
+    font-family:'Inter',sans-serif;
+    overflow:hidden; cursor:default;
+  }
+  #canvas-container{ position:fixed; inset:0; }
+  canvas{ display:block; }
+
+  /* ============ CAPA DE ETIQUETAS 3D PROYECTADAS ============ */
+  #label-layer{ position:fixed; inset:0; pointer-events:none; z-index:5; }
+  .lbl{
+    position:absolute; transform:translate(-50%,-50%);
+    font-family:'JetBrains Mono',monospace; font-size:11px;
+    letter-spacing:0.04em; color:var(--blue-bright);
+    background:rgba(8,12,20,0.6); border:1px solid var(--panel-border);
+    padding:3px 8px; border-radius:2px; white-space:nowrap;
+    opacity:0; transition:opacity .45s ease; backdrop-filter:blur(2px);
+  }
+  .lbl.core{
+    font-family:'Space Grotesk',sans-serif; color:var(--accent);
+    font-size:13px; font-weight:600; border-color:rgba(217,154,78,0.35);
+    padding:5px 12px;
+  }
+  .lbl.dim{ color:var(--text-dim); border-color:rgba(120,150,190,0.10); font-size:10px; }
+  .lbl.stat{ background:transparent; border:none; text-align:center; backdrop-filter:none; }
+  .lbl.stat .num{
+    display:block; font-size:24px; font-weight:700; color:var(--text);
+    line-height:1.05; text-shadow:0 2px 18px rgba(0,0,0,0.75);
+  }
+  .lbl.stat .cap{
+    display:block; font-family:'Inter',sans-serif; font-size:9.5px;
+    letter-spacing:0.14em; text-transform:uppercase; color:var(--text-dim); margin-top:4px;
+  }
+  #tooltip{
+    position:fixed; z-index:30; pointer-events:none;
+    font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text);
+    background:rgba(10,15,25,0.92); border:1px solid var(--panel-border);
+    padding:6px 10px; border-radius:3px; opacity:0; transition:opacity .15s;
+    max-width:260px; white-space:normal; line-height:1.5;
+  }
+  #tooltip .tt-dim{ color:var(--text-dim); }
+
+  /* ============ HUD ============ */
+  .hud{ position:fixed; z-index:10; }
+
+  #topbar{
+    top:0; left:0; right:0; display:flex; justify-content:space-between;
+    align-items:flex-start; padding:24px 36px; pointer-events:none;
+  }
+  #study-title{ max-width:560px; }
+  #study-title .eyebrow{
+    font-family:'JetBrains Mono',monospace; font-size:10px;
+    letter-spacing:0.2em; color:var(--text-faint); text-transform:uppercase;
+  }
+  #study-title h1{
+    font-family:'Space Grotesk',sans-serif; font-size:19px; font-weight:600;
+    margin:7px 0 0; line-height:1.35; color:var(--text);
+  }
+  #topbar-right{ text-align:right; }
+  #scene-counter{
+    font-family:'JetBrains Mono',monospace; font-size:12px;
+    letter-spacing:0.14em; color:var(--text-dim);
+  }
+  #scene-counter .current{ color:var(--accent); font-weight:700; }
+  #n-badge{
+    margin-top:8px; font-family:'JetBrains Mono',monospace; font-size:10.5px;
+    color:var(--text-faint); letter-spacing:0.1em;
+  }
+
+  /* ---- riel de navegación ---- */
+  #rail{
+    left:0; top:50%; transform:translateY(-50%);
+    display:flex; flex-direction:column; gap:2px; padding:10px 0 10px 14px;
+  }
+  .rail-item{
+    display:flex; align-items:center; gap:10px; padding:7px 14px 7px 8px;
+    cursor:pointer; border-left:2px solid transparent; user-select:none;
+    transition:border-color .3s, background .3s;
+  }
+  .rail-item:hover{ background:rgba(120,150,190,0.07); }
+  .rail-item.active{ border-left-color:var(--accent); }
+  .rail-item .num{
+    font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text-faint);
+    width:18px; transition:color .3s;
+  }
+  .rail-item.active .num{ color:var(--accent); }
+  .rail-item .name{
+    font-size:11.5px; color:var(--text-faint); letter-spacing:0.03em;
+    transition:color .3s; max-width:0; overflow:hidden; white-space:nowrap;
+  }
+  #rail:hover .rail-item .name{ max-width:220px; transition:max-width .35s ease, color .3s; }
+  .rail-item.active .name{ max-width:220px; color:var(--text); }
+  .rail-item:hover .name{ color:var(--text-dim); }
+
+  /* ---- panel narrativo principal (flotante: arrastrable y colapsable) ---- */
+  #panel{
+    left:36px; bottom:34px; width:440px;
+    background:var(--panel); border:1px solid var(--panel-border);
+    border-radius:4px; overflow:hidden; backdrop-filter:blur(8px);
+    transition:opacity .5s ease, transform .5s ease;
+  }
+  #panel.dragging{ transition:opacity .5s ease; }
+  #panel.fade{ opacity:0; transform:translateY(8px); }
+  #panel-head{
+    display:flex; align-items:center; gap:10px;
+    padding:9px 14px; cursor:move; user-select:none; touch-action:none;
+    border-bottom:1px solid var(--panel-border);
+    font-family:'JetBrains Mono',monospace; font-size:9.5px;
+    letter-spacing:0.16em; text-transform:uppercase; color:var(--text-dim);
+  }
+  #panel-head .grip{ color:var(--text-faint); letter-spacing:0; font-size:11px; }
+  #panel-title{ flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #panel-toggle{
+    cursor:pointer; color:var(--text-faint); font-size:15px; line-height:1;
+    padding:0 5px; font-family:'Inter',sans-serif;
+  }
+  #panel-toggle:hover{ color:var(--text); }
+  #panel-body{ padding:16px 22px 18px; overflow-y:auto; max-height:calc(34vh - 42px); }
+  #panel.collapsed #panel-body{ display:none; }
+  #panel.collapsed #panel-head{ border-bottom:none; }
+  #panel h2{
+    font-family:'Space Grotesk',sans-serif; font-size:15.5px; font-weight:600;
+    margin:0 0 4px; color:var(--text);
+  }
+  #panel .kicker{
+    font-family:'JetBrains Mono',monospace; font-size:9.5px;
+    letter-spacing:0.18em; text-transform:uppercase; color:var(--accent-dim);
+    margin-bottom:8px;
+  }
+  #panel p{ font-size:12.5px; line-height:1.65; color:var(--text-dim); margin:8px 0; }
+  #panel p strong{ color:var(--text); font-weight:600; }
+  #panel .mono{ font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--blue-bright); }
+  #panel .note{
+    font-size:10.5px; color:var(--text-faint); border-top:1px solid var(--panel-border);
+    margin-top:12px; padding-top:9px; line-height:1.55;
+  }
+  #panel-body::-webkit-scrollbar, #detail::-webkit-scrollbar{ width:5px; }
+  #panel-body::-webkit-scrollbar-thumb, #detail::-webkit-scrollbar-thumb{
+    background:var(--line); border-radius:3px;
+  }
+
+  /* ---- panel de detalle (selección) ---- */
+  #detail{
+    right:36px; bottom:34px; width:372px; max-height:56vh;
+    background:var(--panel); border:1px solid var(--panel-border);
+    border-radius:4px; padding:18px 20px; overflow-y:auto;
+    backdrop-filter:blur(8px); opacity:0; transform:translateX(10px);
+    transition:opacity .4s ease, transform .4s ease; pointer-events:none;
+  }
+  #detail.show{ opacity:1; transform:none; pointer-events:auto; }
+  #detail h3{
+    font-family:'Space Grotesk',sans-serif; font-size:14px; font-weight:600;
+    margin:0 0 2px; color:var(--text); padding-right:22px;
+  }
+  #detail .sub{
+    font-family:'JetBrains Mono',monospace; font-size:9.5px;
+    letter-spacing:0.14em; text-transform:uppercase; color:var(--accent-dim);
+    margin-bottom:10px;
+  }
+  #detail table{ width:100%; border-collapse:collapse; margin:8px 0; }
+  #detail td, #detail th{
+    font-size:11px; padding:4px 6px; text-align:left; color:var(--text-dim);
+    border-bottom:1px solid rgba(120,150,190,0.08);
+  }
+  #detail th{
+    font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:0.12em;
+    text-transform:uppercase; color:var(--text-faint); font-weight:500;
+  }
+  #detail td.v{ font-family:'JetBrains Mono',monospace; color:var(--blue-bright); text-align:right; }
+  #detail td.v.neg{ color:var(--risk); }
+  #detail td.v.ns{ color:var(--text-faint); }
+  #detail .fig{ font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--blue-bright); }
+  #detail p{ font-size:12px; line-height:1.6; color:var(--text-dim); margin:7px 0; }
+  #detail .omega-row{ display:flex; align-items:center; gap:8px; margin:5px 0; }
+  #detail .omega-row .f{ font-size:11px; color:var(--text-dim); flex:1; }
+  #detail .omega-bar{
+    height:4px; border-radius:2px; background:var(--line);
+    width:110px; position:relative; overflow:hidden; flex:none;
+  }
+  #detail .omega-bar i{
+    position:absolute; inset:0; background:var(--blue-bright);
+    transform-origin:left; display:block; border-radius:2px;
+  }
+  #detail .omega-val{
+    font-family:'JetBrains Mono',monospace; font-size:10.5px;
+    color:var(--blue-bright); width:42px; text-align:right; flex:none;
+  }
+  #detail-close{
+    position:absolute; top:10px; right:12px; cursor:pointer;
+    color:var(--text-faint); font-size:15px; line-height:1;
+    font-family:'Inter',sans-serif; padding:2px 4px;
+  }
+  #detail-close:hover{ color:var(--text); }
+  #detail .tag{
+    display:inline-block; font-family:'JetBrains Mono',monospace; font-size:9.5px;
+    letter-spacing:0.08em; padding:2px 8px; border-radius:2px; margin:2px 4px 2px 0;
+    border:1px solid var(--panel-border); color:var(--text-dim);
+  }
+  #detail .tag.good{ color:var(--blue-bright); border-color:rgba(142,195,239,0.3); }
+  #detail .tag.warn{ color:var(--text-dim); }
+
+  /* ---- chips de sub-selección por escena ---- */
+  #chips{
+    bottom:34px; left:50%; transform:translateX(-50%);
+    display:flex; gap:6px; flex-wrap:wrap; justify-content:center;
+    max-width:46vw; opacity:0; pointer-events:none; transition:opacity .4s ease;
+  }
+  #chips.show{ opacity:1; pointer-events:auto; }
+  .chip{
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.05em;
+    color:var(--text-dim); background:rgba(13,19,31,0.7);
+    border:1px solid var(--panel-border); border-radius:3px;
+    padding:6px 12px; cursor:pointer; user-select:none;
+    transition:color .25s, border-color .25s, background .25s;
+  }
+  .chip:hover{ color:var(--text); border-color:rgba(120,150,190,0.35); }
+  .chip.active{
+    color:var(--accent); border-color:rgba(217,154,78,0.45);
+    background:rgba(217,154,78,0.06);
+  }
+
+  /* ---- controles / ayuda ---- */
+  #hint{
+    right:36px; top:96px; font-family:'JetBrains Mono',monospace;
+    font-size:9.5px; letter-spacing:0.1em; color:var(--text-faint);
+    text-align:right; line-height:2; pointer-events:none;
+  }
+  #hint b{ color:var(--text-dim); font-weight:500; }
+  #nav-arrows{
+    bottom:110px; left:50%; transform:translateX(-50%);
+    display:flex; gap:10px;
+  }
+  .nav-btn{
+    width:38px; height:38px; border-radius:3px; border:1px solid var(--panel-border);
+    background:rgba(13,19,31,0.7); color:var(--text-dim); font-size:15px;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    user-select:none; transition:color .25s, border-color .25s;
+    font-family:'Space Grotesk',sans-serif;
+  }
+  .nav-btn:hover{ color:var(--text); border-color:rgba(120,150,190,0.4); }
+
+  /* ---- overlay de inicio ---- */
+  #intro{
+    position:fixed; inset:0; z-index:40; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center;
+    background:radial-gradient(ellipse at center, rgba(10,14,22,0.86) 0%, rgba(6,8,16,0.97) 75%);
+    transition:opacity 1.1s ease; padding:24px;
+  }
+  #intro.gone{ opacity:0; pointer-events:none; }
+  #intro .eyebrow{
+    font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.28em;
+    color:var(--accent-dim); text-transform:uppercase;
+  }
+  #intro h1{
+    font-family:'Space Grotesk',sans-serif; font-size:clamp(24px,3.4vw,40px);
+    font-weight:600; max-width:820px; line-height:1.3; margin:18px 0 10px;
+  }
+  #intro .sub{
+    font-size:14px; color:var(--text-dim); max-width:640px; line-height:1.7; margin:0 0 6px;
+  }
+  #intro .figures{
+    display:flex; gap:42px; margin:34px 0 8px; flex-wrap:wrap; justify-content:center;
+  }
+  #intro .figures div{ text-align:center; }
+  #intro .figures .n{
+    font-family:'JetBrains Mono',monospace; font-size:30px; font-weight:700; color:var(--text);
+  }
+  #intro .figures .c{
+    font-size:10px; letter-spacing:0.16em; text-transform:uppercase;
+    color:var(--text-faint); margin-top:5px;
+  }
+  #start-btn{
+    margin-top:34px; font-family:'Space Grotesk',sans-serif; font-size:14px;
+    letter-spacing:0.06em; color:var(--accent); background:transparent;
+    border:1px solid rgba(217,154,78,0.5); border-radius:3px;
+    padding:13px 42px; cursor:pointer; transition:background .3s, color .3s;
+  }
+  #start-btn:hover{ background:rgba(217,154,78,0.1); }
+  #intro .ethics{
+    margin-top:26px; font-size:10.5px; color:var(--text-faint); max-width:560px; line-height:1.6;
+  }
+  #intro .keys{
+    margin-top:14px; font-family:'JetBrains Mono',monospace; font-size:10px;
+    letter-spacing:0.1em; color:var(--text-faint);
+  }
+
+  /* ---- overlay de ayuda ---- */
+  #help{
+    position:fixed; inset:0; z-index:35; display:flex; align-items:center; justify-content:center;
+    background:rgba(6,8,16,0.85); opacity:0; pointer-events:none; transition:opacity .3s;
+  }
+  #help.show{ opacity:1; pointer-events:auto; }
+  #help .box{
+    background:var(--panel); border:1px solid var(--panel-border); border-radius:4px;
+    padding:28px 34px; max-width:420px;
+  }
+  #help h3{ font-family:'Space Grotesk',sans-serif; margin:0 0 14px; font-size:16px; }
+  #help .row{ display:flex; gap:14px; margin:9px 0; font-size:12px; color:var(--text-dim); }
+  #help kbd{
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--blue-bright);
+    border:1px solid var(--panel-border); border-radius:3px; padding:2px 8px; min-width:66px;
+    text-align:center; flex:none;
+  }
+  #veil{
+    position:fixed; inset:0; z-index:20; background:var(--bg-deep);
+    opacity:0; pointer-events:none; transition:opacity .4s ease;
+  }
+  @media (max-width:1100px){
+    #panel{ width:min(400px, 44vw); }
+    #detail{ width:min(340px, 40vw); }
+    #chips{ max-width:80vw; bottom:104px; }
+    #nav-arrows{ display:none; }
+  }
+</style>
+</head>
+<body>
+<div id="canvas-container"></div>
+<div id="label-layer"></div>
+<div id="tooltip"></div>
+<div id="veil"></div>
+
+<div id="topbar" class="hud">
+  <div id="study-title">
+    <div class="eyebrow">UBPD · Colombia — Tesis doctoral · UPNA</div>
+    <h1>Bienestar emocional y psicológico en profesionales de búsqueda de personas dadas por desaparecidas</h1>
+  </div>
+  <div id="topbar-right">
+    <div id="scene-counter"><span class="current">01</span> / 07</div>
+    <div id="n-badge">n = 220 · datos agregados</div>
+  </div>
+</div>
+
+<div id="rail" class="hud"></div>
+
+<div id="hint" class="hud">
+  <b>← →</b> escenas &nbsp;·&nbsp; <b>arrastrar</b> rotar<br>
+  <b>rueda</b> acercar &nbsp;·&nbsp; <b>clic</b> explorar &nbsp;·&nbsp; <b>H</b> ayuda
+</div>
+
+<div id="panel" class="hud">
+  <div id="panel-head">
+    <span class="grip">⠿</span>
+    <span id="panel-title"></span>
+    <span id="panel-toggle" title="Colapsar / expandir">−</span>
+  </div>
+  <div id="panel-body"></div>
+</div>
+<div id="detail" class="hud"><div id="detail-close">×</div><div id="detail-body"></div></div>
+<div id="chips" class="hud"></div>
+<div id="nav-arrows" class="hud">
+  <div class="nav-btn" id="btn-prev">←</div>
+  <div class="nav-btn" id="btn-next">→</div>
+</div>
+
+<div id="help">
+  <div class="box">
+    <h3>Controles del recorrido</h3>
+    <div class="row"><kbd>← / →</kbd><span>Escena anterior / siguiente</span></div>
+    <div class="row"><kbd>1 – 7</kbd><span>Ir directamente a una escena</span></div>
+    <div class="row"><kbd>arrastrar</kbd><span>Rotar la cámara alrededor de la escena</span></div>
+    <div class="row"><kbd>rueda</kbd><span>Acercar / alejar</span></div>
+    <div class="row"><kbd>clic</kbd><span>Seleccionar un elemento para ver su detalle</span></div>
+    <div class="row"><kbd>Esc</kbd><span>Cerrar detalle / esta ayuda</span></div>
+    <div class="row"><kbd>H</kbd><span>Mostrar u ocultar esta ayuda</span></div>
+  </div>
+</div>
+
+<div id="intro">
+  <div class="eyebrow">Unidad de Búsqueda de Personas dadas por Desaparecidas</div>
+  <h1>Bienestar emocional y psicológico en profesionales de búsqueda de personas desaparecidas</h1>
+  <p class="sub">Recorrido interactivo por los resultados del estudio doctoral — validación psicométrica,
+  asociaciones, modelos multivariados y contraste de hipótesis.</p>
+  <div class="figures">
+    <div><div class="n">220</div><div class="c">profesionales</div></div>
+    <div><div class="n">7</div><div class="c">instrumentos</div></div>
+    <div><div class="n">4</div><div class="c">modelos de regresión</div></div>
+    <div><div class="n">1</div><div class="c">modelo de mediación</div></div>
+    <div><div class="n">4</div><div class="c">hipótesis</div></div>
+  </div>
+  <button id="start-btn">Iniciar recorrido</button>
+  <p class="ethics">Toda la información presentada es agregada y anónima: medias, índices de ajuste,
+  fiabilidad, correlaciones y coeficientes de modelos. Ningún dato individual identificable forma
+  parte de esta pieza.</p>
+  <p class="keys">← → navegar · arrastrar rotar · clic explorar · H ayuda</p>
+</div>
+
+<script>
+/* ======================================================================
+   CAPA DE DATOS — todos los valores provienen del plan de análisis
+   (Plan_Analisis_Doctorado_UPNA.Rmd renderizado). Solo datos agregados.
+   ====================================================================== */
+
+var STUDY = {
+  n_total: 220,
+  instruments: [
+    { key:'ryff',   name:'Ryff — Bienestar psicológico' },
+    { key:'cope',   name:'COPE-14 — Afrontamiento' },
+    { key:'apgar',  name:'APGAR familiar' },
+    { key:'mos',    name:'MOS — Apoyo social' },
+    { key:'proqol', name:'ProQOL-vIV — Calidad de vida profesional' },
+    { key:'mbi',    name:'MBI-GS — Burnout' },
+    { key:'iesr',   name:'IES-R — Impacto de evento' }
+  ],
+  sociodemo: {
+    edad: { media:39.3, de:8.4, min:22, max:66 },
+    genero: [
+      { label:'Femenino', n:139 },
+      { label:'Masculino', n:78 },
+      { label:'No binario', n:3 },
+      { label:'Prefiere no responder', n:1 }
+    ],
+    /* El plan no reporta la distribución global Central/Territorial;
+       se muestran los rangos de casos completos por instrumento. */
+    nivel: {
+      centralMin:38, centralMax:41,
+      territorialMin:169, territorialMax:176,
+      nota:'casos completos por instrumento (análisis de invarianza)'
+    },
+    /* condición de víctima del conflicto: grupos de invarianza del plan */
+    victima: { siMin:59, siMax:64, noMin:147, noMax:155 }
+  }
+};
+
+var SCENES_META = [
+  { id:0, short:'Apertura' },
+  { id:1, short:'Perfil sociodemográfico' },
+  { id:2, short:'Galería de instrumentos' },
+  { id:3, short:'Correlaciones' },
+  { id:4, short:'Regresión múltiple' },
+  { id:5, short:'Modelo de mediación (SEM)' },
+  { id:6, short:'Síntesis de hipótesis' }
+];
+
+/* ---- AFC (WLSMV), fiabilidad omega e invarianza por instrumento ---- */
+var INSTRUMENT_DETAIL = {
+  ryff: {
+    label:'Ryff', full:'Ryff — Bienestar psicológico', n:209, modelName:'6 factores',
+    fit:{ chi2:499.12, gl:194, cfi:0.907, tli:0.889, rmsea:0.087, rmseaCI:'[0.078, 0.096]', srmr:0.094, cargaMin:0.395, cargaMax:0.861 },
+    factors:[
+      { name:'autoaceptación', omega:0.679 },
+      { name:'relaciones positivas', omega:0.717 },
+      { name:'autonomía', omega:0.545 },
+      { name:'dominio del entorno', omega:0.627 },
+      { name:'propósito vital', omega:0.812 },
+      { name:'crecimiento personal', omega:0.843 }
+    ],
+    inv:{ genero:{ dcfi:0.004, n:'129 F / 76 M' }, nivel:{ dcfi:0.005, n:'40 C / 169 T' } }
+  },
+  cope: {
+    label:'COPE-14', full:'COPE-14 — Afrontamiento', n:214, modelName:'3 factores',
+    fit:{ chi2:204.29, gl:74, cfi:0.894, tli:0.870, rmsea:0.091, rmseaCI:'[0.076, 0.106]', srmr:0.107, cargaMin:0.523, cargaMax:0.846 },
+    factors:[
+      { name:'apoyo social', omega:0.837 },
+      { name:'afrontamiento pasivo', omega:0.845 },
+      { name:'afrontamiento activo', omega:0.774 }
+    ],
+    inv:{ genero:{ dcfi:0.002, n:'135 F / 75 M' }, nivel:{ dcfi:-0.004, n:'39 C / 175 T' } }
+  },
+  apgar: {
+    label:'APGAR familiar', full:'APGAR familiar', n:217, modelName:'unidimensional',
+    fit:{ chi2:106.26, gl:14, cfi:0.967, tli:0.950, rmsea:0.175, rmseaCI:'[0.145, 0.206]', srmr:0.058, cargaMin:0.709, cargaMax:0.914 },
+    factors:[ { name:'funcionalidad familiar', omega:0.934 } ],
+    inv:{ genero:{ dcfi:0.001, n:'136 F / 77 M' }, nivel:{ dcfi:0.001, n:'41 C / 176 T' } }
+  },
+  mos: {
+    label:'MOS', full:'MOS — Apoyo social', n:212, modelName:'3 factores',
+    fit:{ chi2:484.25, gl:149, cfi:0.979, tli:0.976, rmsea:0.103, rmseaCI:'[0.093, 0.114]', srmr:0.047, cargaMin:0.747, cargaMax:0.962 },
+    factors:[
+      { name:'apoyo emocional / informacional', omega:0.975 },
+      { name:'apoyo instrumental', omega:0.943 },
+      { name:'interacción social positiva + afectivo', omega:0.965 }
+    ],
+    inv:{ genero:{ dcfi:0.000, n:'133 F / 75 M' }, nivel:{ dcfi:0.000, n:'40 C / 172 T' } }
+  },
+  proqol: {
+    label:'ProQOL-vIV', full:'ProQOL-vIV — Calidad de vida profesional', n:208, modelName:'3 factores (reducido)',
+    fit:{ chi2:1035.40, gl:321, cfi:0.878, tli:0.867, rmsea:0.104, rmseaCI:'[0.097, 0.111]', srmr:0.103, cargaMin:0.198, cargaMax:0.932 },
+    factors:[
+      { name:'satisfacción por compasión', omega:0.908 },
+      { name:'burnout', omega:0.894 },
+      { name:'estrés traumático secundario', omega:0.876 }
+    ],
+    inv:{ genero:{ dcfi:0.005, n:'131 F / 73 M' }, nivel:{ dcfi:0.007, n:'38 C / 170 T' } }
+  },
+  mbi: {
+    label:'MBI-GS', full:'MBI-GS — Burnout', n:217, modelName:'3 factores',
+    fit:{ chi2:244.71, gl:101, cfi:0.985, tli:0.982, rmsea:0.081, rmseaCI:'[0.068, 0.094]', srmr:0.058, cargaMin:0.552, cargaMax:0.970 },
+    factors:[
+      { name:'agotamiento', omega:0.947 },
+      { name:'cinismo', omega:0.919 },
+      { name:'eficacia profesional', omega:0.942 }
+    ],
+    inv:{ genero:{ dcfi:0.001, n:'135 F / 78 M' }, nivel:{ dcfi:0.000, n:'41 C / 176 T' } }
+  },
+  iesr: {
+    label:'IES-R', full:'IES-R — Impacto de evento', n:208, modelName:'2 factores',
+    fit:{ chi2:623.70, gl:208, cfi:0.965, tli:0.961, rmsea:0.098, rmseaCI:'[0.089, 0.107]', srmr:0.056, cargaMin:0.620, cargaMax:0.900 },
+    factors:[
+      { name:'intrusión + hiperactivación', omega:0.970 },
+      { name:'evitación', omega:0.929 }
+    ],
+    inv:{ genero:{ dcfi:0.001, n:'128 F / 76 M' }, nivel:{ dcfi:null, n:'no estimable' } }
+  }
+};
+var INSTRUMENT_ORDER = ['ryff','cope','apgar','mos','proqol','mbi','iesr'];
+
+/* ---- Correlaciones de Spearman (p ajustada por Holm) ---- */
+var CORR_ORDER_PRED = ['mos_global','mos_red','apgar_fam','apgar_ami','cope_activo','cope_apoyo','pq_satisf','cope_pasivo','exp_entidad','antiguedad_cargo'];
+var CORR_ORDER_OUT  = ['ryff_total','pq_burnout','pq_ets','mbi_agotam','mbi_cinismo','mbi_eficacia','iesr_total'];
+var CORR_LABEL = {
+  mos_global:'Apoyo social (MOS)', mos_red:'Red de apoyo (MOS)',
+  apgar_fam:'Funcionalidad familiar', apgar_ami:'Apoyo de amigos',
+  cope_activo:'Afrontamiento activo', cope_apoyo:'Afront. de apoyo',
+  pq_satisf:'Satisfacción por compasión', cope_pasivo:'Afrontamiento pasivo',
+  exp_entidad:'Años de experiencia', antiguedad_cargo:'Antigüedad en el cargo',
+  ryff_total:'Bienestar psicológico', pq_burnout:'Burnout (ProQOL)',
+  pq_ets:'Estrés traumático secundario', mbi_agotam:'Agotamiento (MBI)',
+  mbi_cinismo:'Cinismo (MBI)', mbi_eficacia:'Eficacia profesional (MBI)',
+  iesr_total:'Impacto de evento (IES-R)'
+};
+var CORR_TYPE = {
+  mos_global:'proteccion', mos_red:'proteccion', apgar_fam:'proteccion', apgar_ami:'proteccion',
+  cope_activo:'proteccion', cope_apoyo:'proteccion', pq_satisf:'proteccion',
+  cope_pasivo:'riesgo', exp_entidad:'riesgo', antiguedad_cargo:'riesgo'
+};
+function cc(r, stars){ return { r:r, stars:stars, sig:stars > 0 }; }
+var CORR_MATRIX = {
+  mos_global:      { ryff_total:cc(0.47,3), pq_burnout:cc(-0.49,3), pq_ets:cc(-0.40,3), mbi_agotam:cc(-0.40,3), mbi_cinismo:cc(-0.43,3), mbi_eficacia:cc(0.21,0), iesr_total:cc(-0.30,3) },
+  mos_red:         { ryff_total:cc(0.34,3), pq_burnout:cc(-0.31,3), pq_ets:cc(-0.26,2), mbi_agotam:cc(-0.22,1), mbi_cinismo:cc(-0.27,2), mbi_eficacia:cc(0.02,0), iesr_total:cc(-0.23,1) },
+  apgar_fam:       { ryff_total:cc(0.41,3), pq_burnout:cc(-0.41,3), pq_ets:cc(-0.39,3), mbi_agotam:cc(-0.34,3), mbi_cinismo:cc(-0.34,3), mbi_eficacia:cc(0.26,2), iesr_total:cc(-0.27,2) },
+  apgar_ami:       { ryff_total:cc(0.48,3), pq_burnout:cc(-0.43,3), pq_ets:cc(-0.26,2), mbi_agotam:cc(-0.25,2), mbi_cinismo:cc(-0.32,3), mbi_eficacia:cc(0.14,0), iesr_total:cc(-0.24,1) },
+  cope_activo:     { ryff_total:cc(0.23,1), pq_burnout:cc(-0.22,1), pq_ets:cc(-0.12,0), mbi_agotam:cc(-0.13,0), mbi_cinismo:cc(-0.22,1), mbi_eficacia:cc(0.26,2), iesr_total:cc(-0.02,0) },
+  cope_apoyo:      { ryff_total:cc(0.04,0), pq_burnout:cc(-0.04,0), pq_ets:cc(0.19,0), mbi_agotam:cc(0.09,0), mbi_cinismo:cc(0.07,0), mbi_eficacia:cc(0.01,0), iesr_total:cc(0.22,1) },
+  pq_satisf:       { ryff_total:cc(0.44,3), pq_burnout:cc(-0.57,3), pq_ets:cc(-0.43,3), mbi_agotam:cc(-0.52,3), mbi_cinismo:cc(-0.58,3), mbi_eficacia:cc(0.54,3), iesr_total:cc(-0.35,3) },
+  cope_pasivo:     { ryff_total:cc(-0.46,3), pq_burnout:cc(0.38,3), pq_ets:cc(0.55,3), mbi_agotam:cc(0.35,3), mbi_cinismo:cc(0.34,3), mbi_eficacia:cc(-0.14,0), iesr_total:cc(0.44,3) },
+  exp_entidad:     { ryff_total:cc(0.04,0), pq_burnout:cc(0.16,0), pq_ets:cc(0.11,0), mbi_agotam:cc(0.25,2), mbi_cinismo:cc(0.22,1), mbi_eficacia:cc(0.09,0), iesr_total:cc(0.05,0) },
+  antiguedad_cargo:{ ryff_total:cc(-0.03,0), pq_burnout:cc(0.20,0), pq_ets:cc(0.05,0), mbi_agotam:cc(0.20,0), mbi_cinismo:cc(0.21,1), mbi_eficacia:cc(0.07,0), iesr_total:cc(0.05,0) }
+};
+
+/* ---- Regresión múltiple (β estandarizados, EE robustos HC3) ---- */
+var REG_PREDICTOR_ORDER = ['mos_global','apgar_fam','cope_activo','cope_pasivo','cope_apoyo','exp_entidad','edad','genero_fMasculino','victima_fSi','nivel_fTerritorial'];
+var REG_PRED_LABEL = {
+  mos_global:'Apoyo social (MOS)', apgar_fam:'Funcionalidad familiar',
+  cope_activo:'Afrontamiento activo', cope_pasivo:'Afrontamiento pasivo',
+  cope_apoyo:'Afront. de apoyo', exp_entidad:'Años de experiencia',
+  edad:'Edad', genero_fMasculino:'Género (masculino)',
+  victima_fSi:'Condición de víctima', nivel_fTerritorial:'Nivel territorial'
+};
+function rb(beta, p){ return { beta:beta, p:p, sig:p < 0.05 }; }
+var REGRESSION_MODELS = {
+  pq_ets: {
+    label:'Estrés traumático secundario', sub:'ProQOL', n:196, r2:0.410,
+    coef:{
+      mos_global:rb(-0.255,0.001), apgar_fam:rb(-0.048,0.521), cope_activo:rb(-0.088,0.143),
+      cope_pasivo:rb(0.432,0.000), cope_apoyo:rb(0.134,0.018), exp_entidad:rb(0.140,0.014),
+      edad:rb(0.023,0.646), genero_fMasculino:rb(-0.149,0.183), victima_fSi:rb(0.110,0.368),
+      nivel_fTerritorial:rb(-0.028,0.843)
+    }
+  },
+  pq_burnout: {
+    label:'Burnout', sub:'ProQOL', n:196, r2:0.378,
+    coef:{
+      mos_global:rb(-0.371,0.000), apgar_fam:rb(-0.044,0.571), cope_activo:rb(-0.168,0.014),
+      cope_pasivo:rb(0.343,0.000), cope_apoyo:rb(0.026,0.702), exp_entidad:rb(0.166,0.006),
+      edad:rb(-0.010,0.872), genero_fMasculino:rb(0.059,0.630), victima_fSi:rb(-0.162,0.184),
+      nivel_fTerritorial:rb(0.062,0.675)
+    }
+  },
+  ryff_total: {
+    label:'Bienestar psicológico', sub:'Ryff', n:189, r2:0.394,
+    coef:{
+      mos_global:rb(0.365,0.000), apgar_fam:rb(0.012,0.892), cope_activo:rb(0.183,0.010),
+      cope_pasivo:rb(-0.389,0.000), cope_apoyo:rb(0.015,0.827), exp_entidad:rb(-0.013,0.820),
+      edad:rb(0.107,0.068), genero_fMasculino:rb(0.024,0.847), victima_fSi:rb(0.071,0.606),
+      nivel_fTerritorial:rb(-0.115,0.405)
+    }
+  },
+  iesr_total: {
+    label:'Impacto de evento', sub:'IES-R', n:188, r2:0.255,
+    coef:{
+      mos_global:rb(-0.307,0.001), apgar_fam:rb(0.041,0.641), cope_activo:rb(-0.011,0.890),
+      cope_pasivo:rb(0.266,0.007), cope_apoyo:rb(0.125,0.058), exp_entidad:rb(0.040,0.523),
+      edad:rb(-0.018,0.789), genero_fMasculino:rb(-0.387,0.002), victima_fSi:rb(0.265,0.073),
+      nivel_fTerritorial:rb(-0.315,0.095)
+    }
+  }
+};
+var REG_MODEL_ORDER = ['pq_ets','pq_burnout','ryff_total','iesr_total'];
+
+/* ---- SEM de mediación (bootstrap 2000, IC 95% BCa) ---- */
+var SEM_DATA = {
+  n: 189,
+  fit: { chisq:0.161, df:1, p:0.688, cfi:1.000, tli:1.052, rmsea:0.000, srmr:0.005 },
+  a1: { est:-0.207, ci:[-0.356,-0.075], p:0.003 },
+  r2_mediator: 0.078,
+  outcomes: {
+    pq_ets: {
+      label:'Estrés traumático secundario', r2:0.399,
+      b:{ est:0.471, ci:[0.338,0.608], p:0.000 },
+      c:{ est:-0.268, ci:[-0.385,-0.162], p:0.000 },
+      ind:{ est:-0.098, ci:[-0.181,-0.034], p:0.008 },
+      tot:{ est:-0.366, ci:[-0.503,-0.251], p:0.000 }
+    },
+    pq_burnout: {
+      label:'Burnout', r2:0.352,
+      b:{ est:0.294, ci:[0.167,0.436], p:0.000 },
+      c:{ est:-0.432, ci:[-0.567,-0.310], p:0.000 },
+      ind:{ est:-0.061, ci:[-0.121,-0.020], p:0.017 },
+      tot:{ est:-0.493, ci:[-0.618,-0.378], p:0.000 }
+    },
+    ryff_total: {
+      label:'Bienestar psicológico', r2:0.377,
+      b:{ est:-0.359, ci:[-0.503,-0.222], p:0.000 },
+      c:{ est:0.409, ci:[0.252,0.572], p:0.000 },
+      ind:{ est:0.074, ci:[0.024,0.145], p:0.017 },
+      tot:{ est:0.483, ci:[0.325,0.656], p:0.000 }
+    }
+  }
+};
+var SEM_OUTCOME_ORDER = ['pq_ets','pq_burnout','ryff_total'];
+
+/* ---- Contraste de hipótesis ---- */
+var HYPOTHESIS_DATA = [
+  {
+    id:'h1', num:'H1', verdict:'Apoyada parcialmente', fill:0.55, kind:'partial',
+    text:'Mayores niveles de apoyo social y funcionalidad familiar se asociarán con menores niveles de estrés traumático secundario y burnout.',
+    evidence:'El apoyo social (MOS) mostró efecto directo e indirecto —vía afrontamiento pasivo— sobre estrés traumático secundario, burnout y bienestar. La funcionalidad familiar (APGAR) perdió significación al controlar por MOS, por la varianza compartida entre ambos factores protectores.'
+  },
+  {
+    id:'h2', num:'H2', verdict:'Apoyada', fill:0.92, kind:'ok',
+    text:'Los estilos de afrontamiento influirán en el bienestar psicológico.',
+    evidence:'Afrontamiento pasivo: β = −.36 sobre bienestar; afrontamiento activo: β = .18. El afrontamiento pasivo media el efecto del apoyo social sobre los tres desenlaces (los IC bootstrap de los efectos indirectos excluyen el cero).'
+  },
+  {
+    id:'h3', num:'H3', verdict:'Apoyada parcialmente', fill:0.55, kind:'partial',
+    text:'La exposición prolongada a contextos traumáticos se asociará con mayor fatiga por compasión.',
+    evidence:'Los años de experiencia predicen estrés traumático secundario (β = .14) y burnout (β = .15) tras ajustar por covariables. No predicen bienestar psicológico ni impacto de evento.'
+  },
+  {
+    id:'h4', num:'H4', verdict:'No apoyada', fill:0.16, kind:'nosup',
+    text:'La edad y los años de experiencia moderarán la relación entre factores de riesgo y bienestar emocional/psicológico.',
+    evidence:'Las interacciones afrontamiento pasivo × edad y afrontamiento pasivo × experiencia no resultaron significativas (p > .22) en ninguno de los tres desenlaces evaluados.'
+  }
+];
+/* ======================================================================
+   MOTOR — renderizador, cámara orbital, transiciones, etiquetas, picking
+   ====================================================================== */
+
+var SCENE_SPACING = 70;
+function sceneOffsetX(i){ return i * SCENE_SPACING; }
+
+var container = document.getElementById('canvas-container');
+var renderer = new THREE.WebGLRenderer({ antialias:true, alpha:false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+container.appendChild(renderer.domElement);
+
+var scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0e16);
+scene.fog = new THREE.FogExp2(0x0a0e16, 0.021);
+
+var camera = new THREE.PerspectiveCamera(46, window.innerWidth/window.innerHeight, 0.1, 300);
+
+scene.add(new THREE.AmbientLight(0x8fa8c2, 0.55));
+var dirLight = new THREE.DirectionalLight(0xbcd4ec, 0.65);
+dirLight.position.set(18, 30, 22);
+scene.add(dirLight);
+var camLight = new THREE.PointLight(0x8ec3ef, 0.75, 55);
+scene.add(camLight);
+var coreLight = new THREE.PointLight(0xd99a4e, 0.9, 26);
+coreLight.position.set(0, 0.5, 2);
+scene.add(coreLight);
+
+/* ---- grupos de escena y registro de interactivos ---- */
+var sceneGroups = [];
+var interactives = [];
+(function(){
+  for (var i = 0; i < 7; i++){
+    var g = new THREE.Group();
+    g.position.x = sceneOffsetX(i);
+    scene.add(g);
+    sceneGroups.push(g);
+    interactives.push([]);
+  }
+})();
+
+/* ---- campo de partículas ambiental por escena + polvo global ---- */
+function buildParticleField(count, spread, color, size, opacity, ySquash){
+  var geo = new THREE.BufferGeometry();
+  var pos = new Float32Array(count * 3);
+  for (var i = 0; i < count; i++){
+    pos[i*3]   = (Math.random() - 0.5) * spread;
+    pos[i*3+1] = (Math.random() - 0.5) * spread * (ySquash || 0.6);
+    pos[i*3+2] = (Math.random() - 0.5) * spread;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  var mat = new THREE.PointsMaterial({
+    color:color, size:size, transparent:true, opacity:opacity,
+    depthWrite:false, sizeAttenuation:true
+  });
+  return new THREE.Points(geo, mat);
+}
+(function(){
+  for (var i = 0; i < 7; i++){
+    var f = buildParticleField(420, 46, 0x4d80ab, 0.05, 0.32, 0.7);
+    sceneGroups[i].add(f);
+  }
+})();
+
+/* ---- utilidades geométricas ---- */
+function makeSphere(radius, color, opts){
+  opts = opts || {};
+  var geo = new THREE.SphereGeometry(radius, 24, 18);
+  var mat = new THREE.MeshPhongMaterial({
+    color:color, emissive:color, emissiveIntensity:(opts.glow != null ? opts.glow : 0.22),
+    shininess:30, transparent:true, opacity:(opts.opacity != null ? opts.opacity : 1)
+  });
+  return new THREE.Mesh(geo, mat);
+}
+function makeBox(w, h, d, color, opts){
+  opts = opts || {};
+  var geo = new THREE.BoxGeometry(w, h, d);
+  var mat = new THREE.MeshPhongMaterial({
+    color:color, emissive:color, emissiveIntensity:(opts.glow != null ? opts.glow : 0.12),
+    shininess:18, transparent:true, opacity:(opts.opacity != null ? opts.opacity : 1)
+  });
+  return new THREE.Mesh(geo, mat);
+}
+/* cilindro delgado entre dos puntos (aristas con grosor real) */
+function makeStrut(p1, p2, radius, color, opacity){
+  var dir = new THREE.Vector3().subVectors(p2, p1);
+  var len = dir.length();
+  var geo = new THREE.CylinderGeometry(radius, radius, len, 6, 1, true);
+  var mat = new THREE.MeshBasicMaterial({
+    color:color, transparent:true, opacity:opacity, depthWrite:false
+  });
+  var mesh = new THREE.Mesh(geo, mat);
+  mesh.position.copy(p1).add(dir.clone().multiplyScalar(0.5));
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
+  return mesh;
+}
+function makeLineSeg(p1, p2, color, opacity){
+  var geo = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+  var mat = new THREE.LineBasicMaterial({ color:color, transparent:true, opacity:opacity, depthWrite:false });
+  return new THREE.Line(geo, mat);
+}
+function makeCurveTube(pts, radius, color, opacity){
+  var curve = new THREE.CatmullRomCurve3(pts);
+  var geo = new THREE.TubeGeometry(curve, 40, radius, 6, false);
+  var mat = new THREE.MeshBasicMaterial({ color:color, transparent:true, opacity:opacity, depthWrite:false });
+  var mesh = new THREE.Mesh(geo, mat);
+  mesh.userData.curve = curve;
+  return mesh;
+}
+function easeInOutCubic(t){ return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2; }
+/* transición suave de opacidad de un material */
+function fadeMaterial(mat, target, duration){
+  var start = mat.opacity, t0 = performance.now();
+  function step(){
+    var t = Math.min(1, (performance.now() - t0) / duration);
+    mat.opacity = start + (target - start) * easeInOutCubic(t);
+    if (t < 1) requestAnimationFrame(step);
+  }
+  step();
+}
+
+/* ---- sistema de etiquetas HTML proyectadas ---- */
+var labelLayer = document.getElementById('label-layer');
+var labels = [];
+function addLabel(anchor, html, opts){
+  opts = opts || {};
+  var el = document.createElement('div');
+  el.className = 'lbl' + (opts.cls ? ' ' + opts.cls : '');
+  el.innerHTML = html;
+  labelLayer.appendChild(el);
+  var item = {
+    el:el, anchor:anchor, sceneIdx:(opts.sceneIdx != null ? opts.sceneIdx : 0),
+    offsetY:(opts.offsetY || 0), visible:true, minCam:(opts.minCam || 0)
+  };
+  labels.push(item);
+  return item;
+}
+function addStatLabel(anchor, num, cap, sceneIdx, offsetY){
+  return addLabel(anchor,
+    '<span class="num">' + num + '</span><span class="cap">' + cap + '</span>',
+    { cls:'stat', sceneIdx:sceneIdx, offsetY:(offsetY || 0) });
+}
+var _v3 = new THREE.Vector3();
+function projectAnchor(anchor){
+  if (anchor.isVector3){ _v3.copy(anchor); }
+  else { anchor.getWorldPosition(_v3); }
+  var v = _v3.clone().project(camera);
+  return {
+    x:(v.x * 0.5 + 0.5) * window.innerWidth,
+    y:(-v.y * 0.5 + 0.5) * window.innerHeight,
+    behind:(v.z > 1 || v.z < -1)
+  };
+}
+/* rectángulos HUD prohibidos para etiquetas */
+function hudRects(){
+  var rects = [];
+  var ids = ['panel','chips','topbar'];
+  for (var i = 0; i < ids.length; i++){
+    var el = document.getElementById(ids[i]);
+    if (el && el.offsetParent !== null) rects.push(el.getBoundingClientRect());
+  }
+  var det = document.getElementById('detail');
+  if (det && det.classList.contains('show')) rects.push(det.getBoundingClientRect());
+  return rects;
+}
+function rectHits(rects, x, y, w, h){
+  for (var i = 0; i < rects.length; i++){
+    var r = rects[i];
+    if (x + w/2 > r.left - 6 && x - w/2 < r.right + 6 &&
+        y + h/2 > r.top - 6 && y - h/2 < r.bottom + 6) return true;
+  }
+  return false;
+}
+function updateLabels(){
+  var rects = hudRects();
+  var placed = [];
+  /* dos pasadas: primero etiquetas prioritarias (stat/core), luego las
+     secundarias (dim), que se ocultan si chocarían con una ya colocada */
+  for (var pass = 0; pass < 2; pass++){
+    for (var i = 0; i < labels.length; i++){
+      var L = labels[i];
+      var isDim = L.el.className.indexOf('dim') >= 0;
+      if ((pass === 0) === isDim) continue;
+      if (L.sceneIdx !== currentScene || !L.visible || transitionActive){
+        L.el.style.opacity = 0;
+        continue;
+      }
+      var p = projectAnchor(L.anchor);
+      if (p.behind){ L.el.style.opacity = 0; continue; }
+      var w = L.el.offsetWidth, h = L.el.offsetHeight;
+      var x = p.x, y = p.y + L.offsetY;
+      if (rectHits(rects, x, y, w, h)){ L.el.style.opacity = 0; continue; }
+      var box = { left:x - w/2, right:x + w/2, top:y - h/2, bottom:y + h/2 };
+      if (isDim){
+        var clash = false;
+        for (var j = 0; j < placed.length; j++){
+          var q = placed[j];
+          if (box.left < q.right + 4 && box.right > q.left - 4 &&
+              box.top < q.bottom + 2 && box.bottom > q.top - 2){ clash = true; break; }
+        }
+        if (clash){ L.el.style.opacity = 0; continue; }
+      }
+      placed.push(box);
+      L.el.style.left = x + 'px';
+      L.el.style.top = y + 'px';
+      L.el.style.opacity = 1;
+    }
+  }
+}
+
+/* ---- tooltip que sigue al cursor ---- */
+var tooltipEl = document.getElementById('tooltip');
+function showTooltip(html, x, y){
+  tooltipEl.innerHTML = html;
+  var tw = 270;
+  var px = Math.min(x + 16, window.innerWidth - tw);
+  tooltipEl.style.left = px + 'px';
+  tooltipEl.style.top = (y + 14) + 'px';
+  tooltipEl.style.opacity = 1;
+}
+function hideTooltip(){ tooltipEl.style.opacity = 0; }
+
+/* ---- gestión del acento cálido (un solo elemento a la vez) ---- */
+var accentState = null;
+function setAccent(mesh){
+  clearAccent();
+  if (!mesh || !mesh.material) return;
+  accentState = {
+    mesh:mesh,
+    color:mesh.material.color.getHex(),
+    emissive:(mesh.material.emissive ? mesh.material.emissive.getHex() : null),
+    intensity:mesh.material.emissiveIntensity
+  };
+  mesh.material.color.setHex(0xd99a4e);
+  if (mesh.material.emissive){
+    mesh.material.emissive.setHex(0xd99a4e);
+    mesh.material.emissiveIntensity = 0.5;
+  }
+}
+function clearAccent(){
+  if (!accentState) return;
+  var m = accentState.mesh.material;
+  m.color.setHex(accentState.color);
+  if (m.emissive && accentState.emissive !== null){
+    m.emissive.setHex(accentState.emissive);
+    m.emissiveIntensity = accentState.intensity;
+  }
+  accentState = null;
+}
+
+/* ---- cámara orbital con presets por escena ---- */
+var CAM_PRESETS = [
+  { r:14.5, phi:1.38, theta:0.00,  ty:0.7 },
+  { r:18.5, phi:1.30, theta:0.06,  ty:2.2 },
+  { r:18.5, phi:1.12, theta:0.00,  ty:0.8 },
+  { r:17.5, phi:1.42, theta:0.00,  ty:0.2 },
+  { r:20.5, phi:1.44, theta:0.00,  ty:0.3 },
+  { r:15.5, phi:1.38, theta:0.00,  ty:0.4 },
+  { r:14.0, phi:1.40, theta:0.00,  ty:1.0 }
+];
+var orbit = { r:14.5, phi:1.38, theta:0, target:new THREE.Vector3(0, 0.7, 0) };
+var orbitVel = { theta:0, phi:0 };
+var userInteractedAt = -1e9;
+function applyOrbit(){
+  var sp = Math.sin(orbit.phi), cp = Math.cos(orbit.phi);
+  camera.position.set(
+    orbit.target.x + orbit.r * sp * Math.sin(orbit.theta),
+    orbit.target.y + orbit.r * cp,
+    orbit.target.z + orbit.r * sp * Math.cos(orbit.theta)
+  );
+  camera.lookAt(orbit.target);
+  camLight.position.copy(camera.position);
+}
+function orbitStateForScene(i, subTarget){
+  var p = CAM_PRESETS[i];
+  var t = subTarget ? subTarget.clone() : new THREE.Vector3(sceneOffsetX(i), p.ty, 0);
+  return { r:p.r, phi:p.phi, theta:p.theta, target:t };
+}
+
+/* ---- transición de cámara entre estados orbitales ---- */
+var transitionActive = false;
+var camTween = null;
+function tweenCameraTo(state, duration, onDone){
+  camTween = {
+    t0:performance.now(), dur:duration,
+    from:{ r:orbit.r, phi:orbit.phi, theta:orbit.theta, target:orbit.target.clone() },
+    to:state, onDone:onDone
+  };
+}
+function stepCamTween(){
+  if (!camTween) return;
+  var t = Math.min(1, (performance.now() - camTween.t0) / camTween.dur);
+  var e = easeInOutCubic(t);
+  orbit.r     = camTween.from.r     + (camTween.to.r     - camTween.from.r) * e;
+  orbit.phi   = camTween.from.phi   + (camTween.to.phi   - camTween.from.phi) * e;
+  orbit.theta = camTween.from.theta + (camTween.to.theta - camTween.from.theta) * e;
+  orbit.target.lerpVectors(camTween.from.target, camTween.to.target, e);
+  if (t >= 1){
+    var cb = camTween.onDone;
+    camTween = null;
+    if (cb) cb();
+  }
+}
+
+/* ---- entrada: arrastre, rueda ---- */
+var dragging = false, lastPX = 0, lastPY = 0, dragDist = 0;
+renderer.domElement.addEventListener('pointerdown', function(e){
+  dragging = true; dragDist = 0; lastPX = e.clientX; lastPY = e.clientY;
+});
+window.addEventListener('pointermove', function(e){
+  mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouseNDC.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  mousePX = e.clientX; mousePY = e.clientY;
+  if (!dragging) return;
+  var dx = e.clientX - lastPX, dy = e.clientY - lastPY;
+  dragDist += Math.abs(dx) + Math.abs(dy);
+  lastPX = e.clientX; lastPY = e.clientY;
+  if (transitionActive || camTween) return;
+  orbitVel.theta = -dx * 0.0038;
+  orbitVel.phi   = -dy * 0.0028;
+  orbit.theta += orbitVel.theta;
+  orbit.phi = Math.max(0.42, Math.min(1.88, orbit.phi + orbitVel.phi));
+  userInteractedAt = performance.now();
+});
+window.addEventListener('pointerup', function(){ dragging = false; });
+renderer.domElement.addEventListener('wheel', function(e){
+  if (transitionActive || camTween) return;
+  orbit.r = Math.max(7, Math.min(34, orbit.r + e.deltaY * 0.012));
+  userInteractedAt = performance.now();
+}, { passive:true });
+
+/* ---- picking ---- */
+var raycaster = new THREE.Raycaster();
+var mouseNDC = new THREE.Vector2(-2, -2);
+var mousePX = 0, mousePY = 0;
+var hoverObj = null;
+function pickInteractive(){
+  raycaster.setFromCamera(mouseNDC, camera);
+  var list = interactives[currentScene];
+  if (!list || !list.length) return null;
+  var hits = raycaster.intersectObjects(list, false);
+  return hits.length ? hits[0].object : null;
+}
+renderer.domElement.addEventListener('click', function(e){
+  if (dragDist > 6 || transitionActive) return;
+  var obj = pickInteractive();
+  var handler = SCENE_CLICK[currentScene];
+  if (handler) handler(obj);
+});
+
+/* ---- HUD: riel, contador, panel, chips ---- */
+var currentScene = 0;
+var railEl = document.getElementById('rail');
+var panelEl = document.getElementById('panel');
+var chipsEl = document.getElementById('chips');
+var detailEl = document.getElementById('detail');
+var detailBody = document.getElementById('detail-body');
+var counterEl = document.getElementById('scene-counter');
+
+function buildRail(){
+  for (var i = 0; i < SCENES_META.length; i++){
+    (function(idx){
+      var d = document.createElement('div');
+      d.className = 'rail-item' + (idx === 0 ? ' active' : '');
+      d.innerHTML = '<span class="num">0' + (idx + 1) + '</span><span class="name">' +
+                    SCENES_META[idx].short + '</span>';
+      d.addEventListener('click', function(){ goToScene(idx); });
+      railEl.appendChild(d);
+    })(i);
+  }
+}
+function updateRail(){
+  var items = railEl.children;
+  for (var i = 0; i < items.length; i++){
+    items[i].className = 'rail-item' + (i === currentScene ? ' active' : '');
+  }
+  counterEl.innerHTML = '<span class="current">0' + (currentScene + 1) + '</span> / 07';
+}
+var panelBodyEl = document.getElementById('panel-body');
+var panelTitleEl = document.getElementById('panel-title');
+var panelToggleEl = document.getElementById('panel-toggle');
+var panelHeadEl = document.getElementById('panel-head');
+function setPanel(html){
+  panelBodyEl.innerHTML = html;
+  panelTitleEl.textContent = '0' + (currentScene + 1) + ' · ' + SCENES_META[currentScene].short;
+}
+panelToggleEl.addEventListener('click', function(e){
+  e.stopPropagation();
+  panelEl.classList.toggle('collapsed');
+  panelToggleEl.textContent = panelEl.classList.contains('collapsed') ? '+' : '−';
+});
+/* arrastre libre del panel desde su cabecera */
+var panelDrag = null;
+panelHeadEl.addEventListener('pointerdown', function(e){
+  if (e.target === panelToggleEl) return;
+  var r = panelEl.getBoundingClientRect();
+  panelDrag = { dx:e.clientX - r.left, dy:e.clientY - r.top };
+  panelEl.classList.add('dragging');
+  e.preventDefault();
+});
+window.addEventListener('pointermove', function(e){
+  if (!panelDrag) return;
+  var w = panelEl.offsetWidth, h = panelEl.offsetHeight;
+  var x = Math.max(4, Math.min(window.innerWidth - w - 4, e.clientX - panelDrag.dx));
+  var y = Math.max(4, Math.min(window.innerHeight - h - 4, e.clientY - panelDrag.dy));
+  panelEl.style.left = x + 'px';
+  panelEl.style.top = y + 'px';
+  panelEl.style.bottom = 'auto';
+  panelEl.style.right = 'auto';
+});
+window.addEventListener('pointerup', function(){
+  if (panelDrag){ panelDrag = null; panelEl.classList.remove('dragging'); }
+});
+function showDetail(html){
+  detailBody.innerHTML = html;
+  detailEl.classList.add('show');
+}
+function hideDetail(){
+  detailEl.classList.remove('show');
+  clearAccent();
+  var reset = SCENE_RESET[currentScene];
+  if (reset) reset();
+}
+document.getElementById('detail-close').addEventListener('click', hideDetail);
+
+function setChips(items, activeKey, onSelect){
+  chipsEl.innerHTML = '';
+  if (!items || !items.length){ chipsEl.classList.remove('show'); return; }
+  for (var i = 0; i < items.length; i++){
+    (function(it){
+      var c = document.createElement('div');
+      c.className = 'chip' + (it.key === activeKey ? ' active' : '');
+      c.textContent = it.label;
+      c.addEventListener('click', function(){ onSelect(it.key); });
+      chipsEl.appendChild(c);
+    })(i && 0 || items[i]);
+  }
+  chipsEl.classList.add('show');
+}
+function markChipActive(key){
+  var kids = chipsEl.children;
+  var conf = CHIP_CONFIG[currentScene];
+  if (!conf) return;
+  for (var i = 0; i < kids.length; i++){
+    kids[i].className = 'chip' + (conf.items[i] && conf.items[i].key === key ? ' active' : '');
+  }
+}
+
+/* ---- cambio de escena ---- */
+var veil = document.getElementById('veil');
+function goToScene(idx){
+  if (idx < 0 || idx > 6 || idx === currentScene || transitionActive) return;
+  transitionActive = true;
+  hideTooltip();
+  hideDetail();
+  clearAccent();
+  panelEl.classList.add('fade');
+  chipsEl.classList.remove('show');
+  var leaving = SCENE_LEAVE[currentScene];
+  if (leaving) leaving();
+  var dist = Math.abs(idx - currentScene);
+  var dur = 1250 + Math.min(dist, 3) * 350;
+  currentScene = idx;
+  updateRail();
+  tweenCameraTo(orbitStateForScene(idx), dur, function(){
+    transitionActive = false;
+    setPanel(PANEL_HTML[idx]);
+    panelEl.classList.remove('fade');
+    var conf = CHIP_CONFIG[idx];
+    if (conf) setChips(conf.items, conf.initial, conf.onSelect);
+    var enter = SCENE_ENTER[idx];
+    if (enter) enter();
+  });
+}
+
+/* ---- teclado ---- */
+window.addEventListener('keydown', function(e){
+  var help = document.getElementById('help');
+  if (e.key === 'Escape'){
+    if (help.classList.contains('show')) help.classList.remove('show');
+    else hideDetail();
+    return;
+  }
+  if (e.key === 'h' || e.key === 'H'){ help.classList.toggle('show'); return; }
+  if (help.classList.contains('show')) return;
+  if (e.key === 'ArrowRight'){ goToScene(currentScene + 1); }
+  else if (e.key === 'ArrowLeft'){ goToScene(currentScene - 1); }
+  else if (e.key >= '1' && e.key <= '7'){ goToScene(parseInt(e.key, 10) - 1); }
+});
+document.getElementById('btn-prev').addEventListener('click', function(){ goToScene(currentScene - 1); });
+document.getElementById('btn-next').addEventListener('click', function(){ goToScene(currentScene + 1); });
+document.getElementById('help').addEventListener('click', function(e){
+  if (e.target === this) this.classList.remove('show');
+});
+
+window.addEventListener('resize', function(){
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+/* ---- registros que llenan las escenas (se definen más abajo) ---- */
+var PANEL_HTML = [];
+var CHIP_CONFIG = {};
+var SCENE_CLICK = {};
+var SCENE_ENTER = {};
+var SCENE_LEAVE = {};
+var SCENE_RESET = {};
+var SCENE_TICK = [];
+/* ======================================================================
+   ESCENAS — construcción de las 7 estaciones del recorrido
+   ====================================================================== */
+
+var COL = {
+  node:0x4d80ab, nodeBright:0x8ec3ef, neutral:0x6c7f96,
+  pos:0x5f9fd0, neg:0xb5654f, risk:0xb5654f,
+  ns:0x3a4657, ok:0x8ec3ef, partial:0x7d94ad, nosup:0x48566a
+};
+function fmt(x, dec){
+  if (x === null || x === undefined) return '—';
+  var s = x.toFixed(dec === undefined ? 3 : dec);
+  return s.replace('-', '−');
+}
+function fmtP(p){
+  if (p < 0.001) return '&lt; .001';
+  return '= ' + p.toFixed(3).replace('0.', '.');
+}
+function stars(k){ return k === 3 ? '***' : (k === 2 ? '**' : (k === 1 ? '*' : '')); }
+
+/* ======================================================================
+   FÁBRICA DE MUNDOS — texturas procedurales, terrenos, galaxias, rocas
+   ====================================================================== */
+function makeNoise(seed){
+  function rnd(ix, iy){
+    var n = Math.sin(ix * 127.1 + iy * 311.7 + seed * 74.7) * 43758.5453;
+    return n - Math.floor(n);
+  }
+  function sm(t){ return t * t * (3 - 2 * t); }
+  return function(x, y){
+    var ix = Math.floor(x), iy = Math.floor(y);
+    var fx = x - ix, fy = y - iy;
+    var a = rnd(ix, iy), b = rnd(ix + 1, iy), c = rnd(ix, iy + 1), d = rnd(ix + 1, iy + 1);
+    var u = sm(fx), v = sm(fy);
+    return a * (1 - u) * (1 - v) + b * u * (1 - v) + c * (1 - u) * v + d * u * v;
+  };
+}
+function fbm(n2, x, y, oct){
+  var s = 0, a = 0.5, f = 1, tot = 0;
+  for (var i = 0; i < oct; i++){ s += n2(x * f, y * f) * a; tot += a; a *= 0.5; f *= 2; }
+  return s / tot;
+}
+function drawCrater(ctx, x, y, r){
+  var g = ctx.createRadialGradient(x, y, r * 0.1, x, y, r);
+  g.addColorStop(0, 'rgba(0,0,0,0.5)');
+  g.addColorStop(0.65, 'rgba(0,0,0,0.2)');
+  g.addColorStop(0.85, 'rgba(255,255,255,0.18)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+}
+/* textura esférica de planeta: bandas, continentes, cráteres, sombreado polar */
+function makePlanetTexture(st){
+  var W = 256, H = 128;
+  var cnv = document.createElement('canvas');
+  cnv.width = W; cnv.height = H;
+  var ctx = cnv.getContext('2d');
+  var img = ctx.createImageData(W, H);
+  var n2 = makeNoise(st.seed || 1);
+  var n2b = makeNoise((st.seed || 1) + 40);
+  for (var py = 0; py < H; py++){
+    var lat = (py / H) * Math.PI;
+    var shade = 0.72 + 0.28 * Math.sin(lat);
+    for (var px = 0; px < W; px++){
+      var xx = px < W / 2 ? px : W - px; /* espejo: evita costura */
+      var v = fbm(n2, xx * 0.06, py * 0.06, 4);
+      var m = v;
+      if (st.bands){
+        var band = 0.5 + 0.5 * Math.sin(py * 0.22 + (v - 0.5) * st.turb);
+        m = band * st.bands + v * (1 - st.bands);
+      }
+      var r = st.dark[0] + (st.base[0] - st.dark[0]) * m;
+      var g = st.dark[1] + (st.base[1] - st.dark[1]) * m;
+      var b = st.dark[2] + (st.base[2] - st.dark[2]) * m;
+      if (st.land){
+        var v2 = fbm(n2b, xx * 0.045, py * 0.045, 4);
+        if (v2 > 0.56){
+          var lm = 0.6 + v * 0.55;
+          r = st.land[0] * lm; g = st.land[1] * lm; b = st.land[2] * lm;
+        }
+        if ((lat < 0.28 || lat > Math.PI - 0.28) && v2 > 0.35){ r = 225; g = 232; b = 238; }
+      }
+      var idx = (py * W + px) * 4;
+      img.data[idx]     = r * shade;
+      img.data[idx + 1] = g * shade;
+      img.data[idx + 2] = b * shade;
+      img.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  if (st.craters){
+    var cr = makeNoise((st.seed || 1) + 90);
+    for (var ci = 0; ci < st.craters; ci++){
+      drawCrater(ctx, cr(ci, 1) * W, 12 + cr(ci, 2) * (H - 24), 2 + cr(ci, 3) * 7);
+    }
+  }
+  var tex = new THREE.CanvasTexture(cnv);
+  return tex;
+}
+/* planeta con atmósfera de borde; devuelve {group, mesh} */
+function makePlanet(radius, st){
+  var group = new THREE.Group();
+  var mesh = new THREE.Mesh(
+    new THREE.SphereGeometry(radius, 40, 28),
+    new THREE.MeshPhongMaterial({ map:makePlanetTexture(st), shininess:6, transparent:true })
+  );
+  group.add(mesh);
+  var atmo = new THREE.Mesh(
+    new THREE.SphereGeometry(radius * 1.07, 32, 22),
+    new THREE.MeshBasicMaterial({ color:(st.atmo || 0x8ec3ef), transparent:true,
+      opacity:0.11, side:THREE.BackSide, depthWrite:false })
+  );
+  group.add(atmo);
+  if (st.rings){
+    var rc = document.createElement('canvas');
+    rc.width = 128; rc.height = 128;
+    var rctx = rc.getContext('2d');
+    var rn = makeNoise((st.seed || 1) + 7);
+    for (var band = 0; band < 26; band++){
+      var rr = 34 + band * 1.1;
+      rctx.strokeStyle = 'rgba(214,190,150,' + (0.10 + rn(band, 3) * 0.5).toFixed(2) + ')';
+      rctx.lineWidth = 1.1;
+      rctx.beginPath();
+      rctx.arc(64, 64, rr, 0, Math.PI * 2);
+      rctx.stroke();
+    }
+    var ring = new THREE.Mesh(
+      new THREE.RingGeometry(radius * 1.35, radius * 2.35, 64),
+      new THREE.MeshBasicMaterial({ map:new THREE.CanvasTexture(rc), transparent:true,
+        opacity:0.8, side:THREE.DoubleSide, depthWrite:false })
+    );
+    ring.rotation.x = Math.PI / 2 - 0.42;
+    group.add(ring);
+  }
+  return { group:group, mesh:mesh };
+}
+/* halo luminoso (sol, núcleos de galaxia) */
+function makeGlowSprite(color, scale, strength){
+  var c = document.createElement('canvas');
+  c.width = 128; c.height = 128;
+  var ctx = c.getContext('2d');
+  var col = new THREE.Color(color);
+  var g = ctx.createRadialGradient(64, 64, 4, 64, 64, 62);
+  var rgb = Math.round(col.r * 255) + ',' + Math.round(col.g * 255) + ',' + Math.round(col.b * 255);
+  g.addColorStop(0, 'rgba(255,255,245,' + (strength || 0.9) + ')');
+  g.addColorStop(0.25, 'rgba(' + rgb + ',0.55)');
+  g.addColorStop(1, 'rgba(' + rgb + ',0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 128, 128);
+  var spr = new THREE.Sprite(new THREE.SpriteMaterial({
+    map:new THREE.CanvasTexture(c), blending:THREE.AdditiveBlending,
+    transparent:true, depthWrite:false
+  }));
+  spr.scale.setScalar(scale);
+  return spr;
+}
+/* terreno planetario: plano desplazado por ruido + textura moteada */
+function makeTerrain(opts){
+  var size = opts.size || 64, seg = 72;
+  var n2 = makeNoise(opts.seed || 7);
+  var geo = new THREE.PlaneGeometry(size, size, seg, seg);
+  var pos = geo.attributes.position;
+  for (var i = 0; i < pos.count; i++){
+    var x = pos.getX(i), y = pos.getY(i);
+    var h = fbm(n2, x * 0.08 + 9, y * 0.08 + 9, 4) * (opts.amp || 1.5);
+    if (opts.flatR){
+      var d = Math.sqrt(x * x + y * y);
+      h *= Math.min(1, Math.max(0.06, (d - opts.flatR) / 7));
+    }
+    pos.setZ(i, h);
+  }
+  geo.computeVertexNormals();
+  var cnv = document.createElement('canvas');
+  cnv.width = 256; cnv.height = 256;
+  var ctx = cnv.getContext('2d');
+  var img = ctx.createImageData(256, 256);
+  var A = opts.colorA, B = opts.colorB;
+  for (var py = 0; py < 256; py++){
+    for (var px = 0; px < 256; px++){
+      var v = fbm(n2, px * 0.045, py * 0.045, 4);
+      var idx = (py * 256 + px) * 4;
+      img.data[idx]     = A[0] + (B[0] - A[0]) * v;
+      img.data[idx + 1] = A[1] + (B[1] - A[1]) * v;
+      img.data[idx + 2] = A[2] + (B[2] - A[2]) * v;
+      img.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  if (opts.craters){
+    var cr = makeNoise((opts.seed || 7) + 55);
+    for (var ci = 0; ci < opts.craters; ci++){
+      drawCrater(ctx, cr(ci, 1) * 256, cr(ci, 2) * 256, 4 + cr(ci, 3) * 16);
+    }
+  }
+  if (opts.cracks){
+    var kn = makeNoise((opts.seed || 7) + 77);
+    ctx.strokeStyle = 'rgba(40,60,90,0.4)';
+    ctx.lineWidth = 1.4;
+    for (var li = 0; li < opts.cracks; li++){
+      ctx.beginPath();
+      var lx = kn(li, 1) * 256, ly = kn(li, 2) * 256;
+      ctx.moveTo(lx, ly);
+      for (var sgm = 0; sgm < 7; sgm++){
+        lx += (kn(li, sgm + 3) - 0.5) * 70;
+        ly += (kn(li, sgm + 9) - 0.5) * 70;
+        ctx.lineTo(lx, ly);
+      }
+      ctx.stroke();
+    }
+  }
+  var mesh = new THREE.Mesh(geo, new THREE.MeshPhongMaterial({
+    map:new THREE.CanvasTexture(cnv), shininess:3
+  }));
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.y = opts.y || 0;
+  return mesh;
+}
+/* galaxia espiral en miniatura; devuelve {group, pick, accent, points} */
+function makeGalaxy(seed){
+  var group = new THREE.Group();
+  var N = 260;
+  var pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
+  var s = seed + 1;
+  function rr(){ s = Math.sin(s) * 43758.5453; return s - Math.floor(s); }
+  for (var i = 0; i < N; i++){
+    var t = rr();
+    var arm = (i % 2) * Math.PI;
+    var ang = arm + t * 4.4 + (rr() - 0.5) * 0.5;
+    var rad = 0.1 + t * 0.9;
+    pos[i * 3]     = Math.cos(ang) * rad;
+    pos[i * 3 + 1] = (rr() - 0.5) * 0.1;
+    pos[i * 3 + 2] = Math.sin(ang) * rad * 0.82;
+    var lum = 0.5 + rr() * 0.5;
+    if (t < 0.22){ col[i * 3] = 1 * lum; col[i * 3 + 1] = 0.94 * lum; col[i * 3 + 2] = 0.82 * lum; }
+    else { col[i * 3] = 0.6 * lum; col[i * 3 + 1] = 0.76 * lum; col[i * 3 + 2] = 1 * lum; }
+  }
+  var geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  var points = new THREE.Points(geo, new THREE.PointsMaterial({
+    size:0.05, vertexColors:true, transparent:true, opacity:0.95, depthWrite:false
+  }));
+  group.add(points);
+  group.add(makeGlowSprite(0x9db8e8, 0.85, 0.75));
+  var accent = makeSphere(0.11, 0xbcd0ea, { glow:0.5 });
+  group.add(accent);
+  var pick = new THREE.Mesh(
+    new THREE.SphereGeometry(0.72, 12, 10),
+    new THREE.MeshBasicMaterial({ color:0x8ec3ef, transparent:true, opacity:0.028, depthWrite:false })
+  );
+  group.add(pick);
+  return { group:group, pick:pick, accent:accent, points:points };
+}
+/* meteorito: icosaedro deformado por ruido */
+function makeAsteroid(radius, seed){
+  var geo = new THREE.IcosahedronGeometry(radius, 1);
+  var n2 = makeNoise(seed);
+  var p = geo.attributes.position;
+  for (var i = 0; i < p.count; i++){
+    var x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    var f = 0.74 + fbm(n2, x * 2.1 + 5, (y + z) * 2.1 + 5, 3) * 0.56;
+    p.setXYZ(i, x * f, y * f, z * f);
+  }
+  geo.computeVertexNormals();
+  return new THREE.Mesh(geo, new THREE.MeshPhongMaterial({
+    color:0x8a7666, flatShading:true, shininess:3
+  }));
+}
+/* identidad planetaria de cada instrumento (se usa en apertura y galería) */
+var PLANET_STYLE = {
+  ryff:   { base:[70,124,186], dark:[22,50,94],   bands:0,    turb:0,   craters:0,  atmo:0x7fb2e8, seed:3, land:[88,138,92] },
+  cope:   { base:[198,110,64], dark:[108,50,32],  bands:0,    turb:0,   craters:10, atmo:0xcf8a5e, seed:5 },
+  apgar:  { base:[216,180,124],dark:[152,112,66], bands:0.5,  turb:2.2, craters:0,  atmo:0xd9c08c, seed:7 },
+  mos:    { base:[64,96,198],  dark:[26,42,118],  bands:0.6,  turb:2.6, craters:0,  atmo:0x6f8fe0, seed:9 },
+  proqol: { base:[208,168,118],dark:[126,86,56],  bands:0.85, turb:3.2, craters:0,  atmo:0xd8b890, seed:11 },
+  mbi:    { base:[144,140,134],dark:[72,70,68],   bands:0,    turb:0,   craters:28, atmo:0x9aa0a8, seed:13 },
+  iesr:   { base:[214,184,132],dark:[150,120,80], bands:0.7,  turb:2.0, craters:0,  atmo:0xd9c49a, seed:15, rings:true }
+};
+
+/* ============================ ESCENA 0 — APERTURA ============================ */
+var s0 = { pivots:[], planets:[] };
+(function(){
+  var G = sceneGroups[0];
+
+  /* el sol: núcleo del estudio — único elemento cálido de la escena */
+  var sunTex = makePlanetTexture({ base:[255,196,96], dark:[198,84,26], bands:0, turb:0, seed:2 });
+  var sun = new THREE.Mesh(
+    new THREE.SphereGeometry(1.15, 44, 30),
+    new THREE.MeshBasicMaterial({ map:sunTex })
+  );
+  sun.position.set(0, 0.7, 0);
+  G.add(sun);
+  s0.sun = sun;
+  var glowIn = makeGlowSprite(0xd99a4e, 4.6, 0.95);
+  glowIn.position.copy(sun.position);
+  G.add(glowIn);
+  s0.glow = glowIn;
+  var glowOut = makeGlowSprite(0xd99a4e, 9.5, 0.35);
+  glowOut.position.copy(sun.position);
+  G.add(glowOut);
+
+  addLabel(sun, 'n = 220 · UBPD', { cls:'core', sceneIdx:0, offsetY:-58 });
+
+  /* siete mundos en órbita: uno por instrumento */
+  var radii = [0.36, 0.38, 0.40, 0.44, 0.55, 0.32, 0.46];
+  for (var i = 0; i < INSTRUMENT_ORDER.length; i++){
+    var key = INSTRUMENT_ORDER[i];
+    var orbitR = 3.3 + i * 1.05;
+
+    /* línea de órbita */
+    var pts = [];
+    for (var a = 0; a <= 128; a++){
+      var ang = (a / 128) * Math.PI * 2;
+      pts.push(new THREE.Vector3(Math.cos(ang) * orbitR, 0.7, Math.sin(ang) * orbitR));
+    }
+    var orbGeo = new THREE.BufferGeometry().setFromPoints(pts);
+    G.add(new THREE.Line(orbGeo, new THREE.LineBasicMaterial({
+      color:0x4d80ab, transparent:true, opacity:0.14, depthWrite:false })));
+
+    /* pivote orbital + planeta */
+    var pivot = new THREE.Group();
+    pivot.position.set(0, 0.7, 0);
+    G.add(pivot);
+    var pl = makePlanet(radii[i], PLANET_STYLE[key]);
+    pl.group.position.set(orbitR, 0, 0);
+    pivot.add(pl.group);
+    pivot.rotation.y = (i / 7) * Math.PI * 2 + 0.6;
+    s0.pivots.push({ pivot:pivot, speed:0.00030 * Math.pow(3.3 / orbitR, 1.4), phase:(i / 7) * Math.PI * 2 + 0.6 });
+    s0.planets.push(pl.mesh);
+
+    var shortName = INSTRUMENT_DETAIL[key].label;
+    addLabel(pl.mesh, shortName, { cls:'dim', sceneIdx:0, offsetY:-22 });
+  }
+
+  var halo = buildParticleField(260, 11, 0x8ec3ef, 0.04, 0.4, 0.5);
+  halo.position.copy(sun.position);
+  G.add(halo);
+  s0.halo = halo;
+})();
+SCENE_TICK[0] = function(t){
+  for (var i = 0; i < s0.pivots.length; i++){
+    var p = s0.pivots[i];
+    p.pivot.rotation.y = p.phase + t * p.speed;
+  }
+  for (var j = 0; j < s0.planets.length; j++){
+    s0.planets[j].rotation.y = t * 0.00035;
+  }
+  s0.halo.rotation.y = -t * 0.00004;
+  var pulse = 4.4 + Math.sin(t * 0.0011) * 0.35;
+  s0.glow.scale.setScalar(pulse);
+  s0.sun.rotation.y = t * 0.00008;
+};
+
+/* ====================== ESCENA 1 — PERFIL SOCIODEMOGRÁFICO ====================== */
+var s1 = {};
+(function(){
+  var G = sceneGroups[1];
+
+  /* suelo lunar bajo las estadísticas flotantes */
+  G.add(makeTerrain({ colorA:[148,150,158], colorB:[74,76,84], craters:26, amp:1.6, y:-2.5, seed:11 }));
+
+  var nMax = STUDY.sociodemo.genero[0].n;
+
+  /* género — barras flotantes */
+  var bars = new THREE.Group();
+  bars.position.set(-7.0, 0, 0);
+  G.add(bars);
+  for (var i = 0; i < STUDY.sociodemo.genero.length; i++){
+    var g = STUDY.sociodemo.genero[i];
+    var h = 0.35 + (g.n / nMax) * 4.4;
+    var bar = makeBox(0.85, h, 0.85, COL.node, { glow:0.16 });
+    bar.position.set(i * 2.0, h / 2, 0);
+    bar.userData.tooltip = '<b>' + g.label + '</b><br><span class="tt-dim">n = ' + g.n + '</span>';
+    bars.add(bar);
+    interactives[1].push(bar);
+    var anchor = new THREE.Object3D();
+    anchor.position.set(i * 2.0, Math.max(h + 0.6, 1.45 + (i % 2) * 1.3), 0);
+    bars.add(anchor);
+    addStatLabel(anchor, g.n, g.label, 1);
+  }
+  var base = makeBox(8.6, 0.06, 1.6, 0x25384f, { glow:0.05, opacity:0.8 });
+  base.position.set(3.0, -0.03, 0);
+  bars.add(base);
+
+  /* edad — anillo con cifras */
+  var dial = new THREE.Group();
+  dial.position.set(6.8, 2.6, 0);
+  G.add(dial);
+  var torus = new THREE.Mesh(
+    new THREE.TorusGeometry(1.9, 0.05, 12, 80),
+    new THREE.MeshPhongMaterial({ color:0x4d80ab, emissive:0x4d80ab, emissiveIntensity:0.3, transparent:true, opacity:0.85 })
+  );
+  dial.add(torus);
+  s1.torus = torus;
+  var inner = buildParticleField(120, 3.2, 0x8ec3ef, 0.04, 0.5, 1);
+  dial.add(inner);
+  s1.dust = inner;
+  var aEdad = STUDY.sociodemo.edad;
+  var aM = new THREE.Object3D(); aM.position.set(0, 0.55, 0); dial.add(aM);
+  addStatLabel(aM, aEdad.media.toFixed(1), 'edad media (años)', 1);
+  var aDE = new THREE.Object3D(); aDE.position.set(-2.9, -1.4, 0); dial.add(aDE);
+  addStatLabel(aDE, 'DE ' + aEdad.de.toFixed(1), 'dispersión', 1);
+  var aRg = new THREE.Object3D(); aRg.position.set(2.9, -1.4, 0); dial.add(aRg);
+  addStatLabel(aRg, aEdad.min + '–' + aEdad.max, 'rango', 1);
+
+  /* condición de víctima del conflicto — placas flotantes */
+  var vc = STUDY.sociodemo.victima;
+  var plates = new THREE.Group();
+  plates.position.set(-0.6, 5.4, -7.5);
+  G.add(plates);
+  var p1 = makeBox(2.9, 1.5, 0.12, 0x4d80ab, { glow:0.14, opacity:0.85 });
+  p1.position.set(-3.6, 0, 0);
+  plates.add(p1);
+  var p2 = makeBox(2.9, 1.5, 0.12, 0x25384f, { glow:0.10, opacity:0.85 });
+  p2.position.set(3.6, 0, 0);
+  plates.add(p2);
+  var an1 = new THREE.Object3D(); an1.position.set(-3.6, 0.1, 0.3); plates.add(an1);
+  addStatLabel(an1, vc.siMin + '–' + vc.siMax, 'se reconoce víctima · aprox.', 1);
+  var an2 = new THREE.Object3D(); an2.position.set(3.6, 0.1, 0.3); plates.add(an2);
+  addStatLabel(an2, vc.noMin + '–' + vc.noMax, 'no se reconoce · aprox.', 1);
+  var an3 = new THREE.Object3D(); an3.position.set(0, -1.35, 0.3); plates.add(an3);
+  addLabel(an3, 'casos completos por instrumento (análisis de invarianza)', { cls:'dim', sceneIdx:1 });
+})();
+SCENE_TICK[1] = function(t){
+  s1.torus.rotation.y = t * 0.00035;
+  s1.torus.rotation.x = Math.sin(t * 0.0003) * 0.25;
+  s1.dust.rotation.y = -t * 0.0002;
+};
+
+/* ====================== ESCENA 2 — GALERÍA DE INSTRUMENTOS ====================== */
+var s2 = { hubs:{}, satLabels:{}, moonPivots:[], planets:[], focused:null };
+(function(){
+  var G = sceneGroups[2];
+  var moonTex = makePlanetTexture({ base:[168,168,172], dark:[86,86,92], bands:0, turb:0, craters:14, seed:33 });
+  for (var i = 0; i < INSTRUMENT_ORDER.length; i++){
+    var key = INSTRUMENT_ORDER[i];
+    var det = INSTRUMENT_DETAIL[key];
+    var ang = (i / 7) * Math.PI * 2 - Math.PI / 2;
+    var hx = Math.cos(ang) * 8.6, hz = Math.sin(ang) * 8.6;
+    var hubGroup = new THREE.Group();
+    hubGroup.position.set(hx, 0.8, hz);
+    G.add(hubGroup);
+
+    /* el planeta del instrumento (misma identidad que en la apertura) */
+    var pl = makePlanet(0.95, PLANET_STYLE[key]);
+    hubGroup.add(pl.group);
+    pl.mesh.userData = { type:'hub', key:key,
+      tooltip:'<b>' + det.full + '</b><br><span class="tt-dim">clic para visitar este mundo · n = ' + det.n + '</span>' };
+    interactives[2].push(pl.mesh);
+    s2.planets.push(pl.mesh);
+    s2.hubs[key] = { group:hubGroup, mesh:pl.mesh, worldPos:new THREE.Vector3(sceneOffsetX(2) + hx, 0.8, hz) };
+
+    addLabel(pl.mesh, det.label, { cls:'dim', sceneIdx:2, offsetY:30 });
+
+    /* las lunas: factores retenidos; tamaño ∝ fiabilidad omega */
+    s2.satLabels[key] = [];
+    for (var f = 0; f < det.factors.length; f++){
+      var fa = det.factors[f];
+      var pivot = new THREE.Group();
+      pivot.rotation.y = (f / det.factors.length) * Math.PI * 2 + i;
+      pivot.rotation.x = Math.sin(f * 2.3 + i) * 0.28;
+      hubGroup.add(pivot);
+      var moonR = 0.13 + fa.omega * 0.22;
+      var moon = new THREE.Mesh(
+        new THREE.SphereGeometry(moonR, 20, 14),
+        new THREE.MeshPhongMaterial({ map:moonTex, shininess:4 })
+      );
+      moon.position.set(1.75 + f * 0.55, 0, 0);
+      pivot.add(moon);
+      moon.userData = { type:'sat', key:key,
+        tooltip:'<b>' + fa.name + '</b><br><span class="tt-dim">ω = ' + fa.omega.toFixed(3) + '</span>' };
+      interactives[2].push(moon);
+      s2.moonPivots.push({ pivot:pivot, speed:(0.00042 - f * 0.00008) * (i % 2 === 0 ? 1 : -1), phase:pivot.rotation.y });
+      var sl = addLabel(moon, fa.name + ' · ω ' + fa.omega.toFixed(2), { cls:'dim', sceneIdx:2, offsetY:-18 });
+      sl.visible = false;
+      s2.satLabels[key].push(sl);
+    }
+  }
+})();
+SCENE_TICK[2] = function(t){
+  for (var i = 0; i < s2.moonPivots.length; i++){
+    var m = s2.moonPivots[i];
+    m.pivot.rotation.y = m.phase + t * m.speed;
+  }
+  for (var j = 0; j < s2.planets.length; j++){
+    s2.planets[j].rotation.y = t * 0.00028;
+  }
+};
+function galleryDetailHTML(key){
+  var d = INSTRUMENT_DETAIL[key];
+  var h = '<h3>' + d.full + '</h3>' +
+    '<div class="sub">AFC · WLSMV · modelo ' + d.modelName + ' · n = ' + d.n + '</div>' +
+    '<table><tr><th>χ² (gl)</th><th>CFI</th><th>TLI</th><th>RMSEA</th><th>SRMR</th></tr>' +
+    '<tr><td class="v">' + d.fit.chi2.toFixed(2) + ' (' + d.fit.gl + ')</td>' +
+    '<td class="v">' + d.fit.cfi.toFixed(3) + '</td><td class="v">' + d.fit.tli.toFixed(3) + '</td>' +
+    '<td class="v">' + d.fit.rmsea.toFixed(3) + '</td><td class="v">' + d.fit.srmr.toFixed(3) + '</td></tr></table>' +
+    '<p style="margin:4px 0"><span class="fig">RMSEA IC 90% ' + d.fit.rmseaCI + '</span> · ' +
+    '<span class="fig">cargas ' + d.fit.cargaMin.toFixed(2) + '–' + d.fit.cargaMax.toFixed(2) + '</span></p>' +
+    '<div class="sub" style="margin-top:12px">Fiabilidad compuesta (ω de McDonald) — sus lunas</div>';
+  for (var i = 0; i < d.factors.length; i++){
+    var f = d.factors[i];
+    h += '<div class="omega-row"><span class="f">' + f.name + '</span>' +
+         '<span class="omega-bar"><i style="transform:scaleX(' + f.omega.toFixed(3) + ')"></i></span>' +
+         '<span class="omega-val">' + f.omega.toFixed(3) + '</span></div>';
+  }
+  h += '<div class="sub" style="margin-top:12px">Invarianza de medida (ΔCFI, umbrales + cargas)</div><p style="margin-top:2px">';
+  h += '<span class="tag good">género ΔCFI = ' + fmt(d.inv.genero.dcfi, 3) + '</span>';
+  if (d.inv.nivel.dcfi === null){
+    h += '<span class="tag warn">nivel: no estimable</span>';
+  } else {
+    h += '<span class="tag good">central/territorial ΔCFI = ' + fmt(d.inv.nivel.dcfi, 3) + '</span>';
+  }
+  h += '</p><p style="font-size:10.5px;color:var(--text-faint)">Grupos: ' + d.inv.genero.n +
+       ' · ' + d.inv.nivel.n + '. ΔCFI ≤ .01 respalda la invarianza.</p>';
+  return h;
+}
+function galleryFocus(key){
+  var hub = s2.hubs[key];
+  if (!hub) return;
+  if (s2.focused && s2.satLabels[s2.focused]){
+    s2.satLabels[s2.focused].forEach(function(L){ L.visible = false; });
+  }
+  s2.focused = key;
+  s2.satLabels[key].forEach(function(L){ L.visible = true; });
+  setAccent(hub.mesh);
+  markChipActive(key);
+  showDetail(galleryDetailHTML(key));
+  if (!transitionActive){
+    tweenCameraTo({ r:7.5, phi:1.25, theta:orbit.theta, target:hub.worldPos.clone() }, 1100, null);
+  }
+}
+function galleryReset(){
+  if (s2.focused && s2.satLabels[s2.focused]){
+    s2.satLabels[s2.focused].forEach(function(L){ L.visible = false; });
+  }
+  s2.focused = null;
+  markChipActive(null);
+  if (!transitionActive){
+    tweenCameraTo(orbitStateForScene(2), 1100, null);
+  }
+}
+SCENE_CLICK[2] = function(obj){
+  if (obj && obj.userData.key){ galleryFocus(obj.userData.key); }
+  else { hideDetail(); }
+};
+SCENE_RESET[2] = galleryReset;
+
+/* ========================= ESCENA 3 — CORRELACIONES =========================
+   Galaxias en miniatura = factores de protección; meteoritos = factores de
+   riesgo/exposición. Los desenlaces permanecen ocultos hasta elegir un
+   factor: entonces emergen con sus correlaciones significativas.           */
+var s3 = { nodes:{}, edges:[], outcomes:[], galaxies:[], asteroids:[], baseInteractives:[], outVisible:false, selected:null };
+(function(){
+  var G = sceneGroups[3];
+  var i, key;
+  var nodePos = {};
+
+  /* factores de protección: 7 galaxias en arco frontal superior */
+  var predsProt = CORR_ORDER_PRED.filter(function(k){ return CORR_TYPE[k] === 'proteccion'; });
+  for (i = 0; i < predsProt.length; i++){
+    key = predsProt[i];
+    var gx = -8.1 + i * 2.7;
+    var gal = makeGalaxy(17 + i * 13);
+    gal.group.position.set(gx, 3.1 + Math.sin(i * 1.7) * 0.7, 2.4);
+    gal.group.rotation.x = 0.5 + Math.sin(i) * 0.2;
+    G.add(gal.group);
+    gal.pick.userData = { type:'cnode', key:key,
+      tooltip:'<b>' + CORR_LABEL[key] + '</b><br><span class="tt-dim">factor de protección · clic para desplegar sus correlaciones</span>' };
+    interactives[3].push(gal.pick);
+    s3.baseInteractives.push(gal.pick);
+    s3.galaxies.push(gal);
+    s3.nodes[key] = { obj:gal.pick, accent:gal.accent, pos:gal.group.position.clone() };
+    nodePos[key] = gal.group.position.clone();
+    var anch = new THREE.Object3D();
+    anch.position.copy(gal.group.position).add(new THREE.Vector3(0, -1.15, 0));
+    G.add(anch);
+    addLabel(anch, CORR_LABEL[key], { cls:'dim', sceneIdx:3 });
+  }
+
+  /* factores de riesgo / exposición: 3 meteoritos en fila inferior */
+  var predsRisk = CORR_ORDER_PRED.filter(function(k){ return CORR_TYPE[k] === 'riesgo'; });
+  for (i = 0; i < predsRisk.length; i++){
+    key = predsRisk[i];
+    var ax = -4.6 + i * 4.6;
+    var ast = makeAsteroid(0.52, 51 + i * 17);
+    ast.position.set(ax, -1.9, 2.8);
+    G.add(ast);
+    ast.userData = { type:'cnode', key:key,
+      tooltip:'<b>' + CORR_LABEL[key] + '</b><br><span class="tt-dim">factor de riesgo / exposición · clic para desplegar sus correlaciones</span>' };
+    interactives[3].push(ast);
+    s3.baseInteractives.push(ast);
+    s3.asteroids.push(ast);
+    s3.nodes[key] = { obj:ast, accent:ast, pos:ast.position.clone() };
+    nodePos[key] = ast.position.clone();
+    var anchR = new THREE.Object3D();
+    anchR.position.copy(ast.position).add(new THREE.Vector3(0, -0.95, 0));
+    G.add(anchR);
+    addLabel(anchR, CORR_LABEL[key], { cls:'dim', sceneIdx:3 });
+  }
+
+  /* desenlaces: ocultos al fondo hasta que se elige un factor */
+  for (i = 0; i < CORR_ORDER_OUT.length; i++){
+    key = CORR_ORDER_OUT[i];
+    var ox = -8.4 + i * 2.8;
+    var out = makeSphere(0.34, COL.neutral, { glow:0.26 });
+    out.position.set(ox, 0.7 + Math.cos(i * 1.4) * 1.6, -5.2);
+    out.material.opacity = 0;
+    G.add(out);
+    out.userData = { type:'cnode', key:key,
+      tooltip:'<b>' + CORR_LABEL[key] + '</b><br><span class="tt-dim">desenlace · clic para aislar sus correlaciones</span>' };
+    s3.outcomes.push(out);
+    s3.nodes[key] = { obj:out, accent:out, pos:out.position.clone() };
+    nodePos[key] = out.position.clone();
+    var anchO = new THREE.Object3D();
+    anchO.position.copy(out.position).add(new THREE.Vector3(0, 0.75, 0));
+    G.add(anchO);
+    var lo = addLabel(anchO, CORR_LABEL[key], { cls:'dim', sceneIdx:3 });
+    lo.visible = false;
+    out.userData.labelItem = lo;
+  }
+
+  /* aristas pre-construidas (46 significativas), invisibles en reposo */
+  for (i = 0; i < CORR_ORDER_PRED.length; i++){
+    var pk = CORR_ORDER_PRED[i];
+    for (var j = 0; j < CORR_ORDER_OUT.length; j++){
+      var ok = CORR_ORDER_OUT[j];
+      var cel = CORR_MATRIX[pk][ok];
+      if (!cel.sig) continue;
+      var mag = Math.abs(cel.r);
+      var eco = cel.r > 0 ? COL.pos : COL.neg;
+      var eop = 0.14 + mag * 0.55;
+      var edge = makeStrut(nodePos[pk], nodePos[ok], 0.012 + mag * 0.07, eco, 0);
+      edge.userData = { p:pk, o:ok, baseOp:eop };
+      G.add(edge);
+      s3.edges.push(edge);
+    }
+  }
+})();
+SCENE_TICK[3] = function(t){
+  for (var i = 0; i < s3.galaxies.length; i++){
+    s3.galaxies[i].points.rotation.y = t * (0.00035 + i * 0.00004);
+  }
+  for (var j = 0; j < s3.asteroids.length; j++){
+    s3.asteroids[j].rotation.y = t * 0.00025;
+    s3.asteroids[j].rotation.x = t * 0.00012;
+  }
+};
+function corrShowOutcomes(show){
+  if (s3.outVisible === show) return;
+  s3.outVisible = show;
+  for (var i = 0; i < s3.outcomes.length; i++){
+    var o = s3.outcomes[i];
+    fadeMaterial(o.material, show ? 0.95 : 0, 420);
+    o.userData.labelItem.visible = show;
+  }
+  interactives[3] = show ? s3.baseInteractives.concat(s3.outcomes) : s3.baseInteractives.slice();
+}
+function corrDetailHTML(key){
+  var isPred = CORR_ORDER_PRED.indexOf(key) >= 0;
+  var partners = isPred ? CORR_ORDER_OUT : CORR_ORDER_PRED;
+  var rows = [];
+  for (var i = 0; i < partners.length; i++){
+    var pk = partners[i];
+    var cel = isPred ? CORR_MATRIX[key][pk] : CORR_MATRIX[pk][key];
+    rows.push({ key:pk, r:cel.r, stars:cel.stars, sig:cel.sig });
+  }
+  rows.sort(function(a, b){ return Math.abs(b.r) - Math.abs(a.r); });
+  var h = '<h3>' + CORR_LABEL[key] + '</h3>' +
+    '<div class="sub">' + (isPred ?
+      (CORR_TYPE[key] === 'proteccion' ? 'factor de protección' : 'factor de riesgo / exposición') :
+      'desenlace psicológico') + ' · ρ de Spearman · p Holm</div>' +
+    '<table><tr><th>' + (isPred ? 'desenlace' : 'factor') + '</th><th style="text-align:right">ρ</th></tr>';
+  for (var k = 0; k < rows.length; k++){
+    var r = rows[k];
+    var cls = r.sig ? (r.r < 0 ? 'v neg' : 'v') : 'v ns';
+    h += '<tr><td>' + CORR_LABEL[r.key] + '</td><td class="' + cls + '">' +
+         fmt(r.r, 2).replace('0.', '.').replace('−0.', '−.') + stars(r.stars) + '</td></tr>';
+  }
+  h += '</table><p style="font-size:10.5px;color:var(--text-faint)">* p&lt;.05 · ** p&lt;.01 · *** p&lt;.001 (ajuste de Holm). Solo las significativas se dibujan en la red.</p>';
+  return h;
+}
+function corrSelect(key){
+  s3.selected = key;
+  corrShowOutcomes(true);
+  setAccent(s3.nodes[key].accent);
+  for (var i = 0; i < s3.edges.length; i++){
+    var e = s3.edges[i];
+    var on = (e.userData.p === key || e.userData.o === key);
+    e.material.opacity = on ? Math.min(0.95, e.userData.baseOp + 0.25) : 0;
+  }
+  showDetail(corrDetailHTML(key));
+}
+function corrReset(){
+  s3.selected = null;
+  corrShowOutcomes(false);
+  for (var i = 0; i < s3.edges.length; i++){
+    s3.edges[i].material.opacity = 0;
+  }
+}
+SCENE_CLICK[3] = function(obj){
+  if (obj && obj.userData.key){ corrSelect(obj.userData.key); }
+  else { hideDetail(); }
+};
+SCENE_RESET[3] = corrReset;
+
+/* ========================= ESCENA 4 — REGRESIÓN MÚLTIPLE =========================
+   Un modelo a la vez, de frente, como un gráfico de barras legible: eje β con
+   líneas de referencia, etiquetas de predictor bajo cada barra y transición
+   animada al cambiar de desenlace con las fichas inferiores.                  */
+var s4 = { bars:[], valAnchors:[], valLabels:[], title:null, current:'pq_ets', anim:null, SCALE:8 };
+(function(){
+  var G = sceneGroups[4];
+  var X0 = -7.2, STEP = 1.6;
+
+  var zero = makeBox(16.8, 0.06, 0.06, 0x4d80ab, { glow:0.12, opacity:0.65 });
+  G.add(zero);
+  var za = new THREE.Object3D(); za.position.set(-9.1, 0, 0); G.add(za);
+  addLabel(za, 'β 0', { cls:'dim', sceneIdx:4 });
+  var refs = [0.2, 0.4, -0.2, -0.4];
+  for (var rI = 0; rI < refs.length; rI++){
+    var ry = refs[rI] * s4.SCALE;
+    var rl = makeBox(16.8, 0.02, 0.02, 0x25384f, { glow:0.02, opacity:0.4 });
+    rl.position.y = ry;
+    G.add(rl);
+    var ra = new THREE.Object3D(); ra.position.set(-9.1, ry, 0); G.add(ra);
+    addLabel(ra, 'β ' + (refs[rI] > 0 ? '.' : '−.') + Math.round(Math.abs(refs[rI]) * 10),
+      { cls:'dim', sceneIdx:4 });
+  }
+
+  var SHORT = {
+    mos_global:'Apoyo social', apgar_fam:'Func. familiar', cope_activo:'Afr. activo',
+    cope_pasivo:'Afr. pasivo', cope_apoyo:'Afr. de apoyo', exp_entidad:'Experiencia',
+    edad:'Edad', genero_fMasculino:'Género (M)', victima_fSi:'Víctima', nivel_fTerritorial:'Territorial'
+  };
+  for (var i = 0; i < REG_PREDICTOR_ORDER.length; i++){
+    var x = X0 + i * STEP;
+    var bar = makeBox(0.92, 1, 0.92, COL.pos, { glow:0.2 });
+    bar.position.set(x, 0.5, 0);
+    bar.userData = { idx:i };
+    G.add(bar);
+    interactives[4].push(bar);
+    s4.bars.push(bar);
+
+    var va = new THREE.Object3D(); va.position.set(x, 1.2, 0); G.add(va);
+    s4.valAnchors.push(va);
+    s4.valLabels.push(addLabel(va, '', { cls:'dim', sceneIdx:4 }));
+
+    var pa = new THREE.Object3D();
+    pa.position.set(x, (i % 2 === 0) ? -4.3 : -5.2, 0);
+    G.add(pa);
+    addLabel(pa, SHORT[REG_PREDICTOR_ORDER[i]], { cls:'dim', sceneIdx:4 });
+  }
+  var ta = new THREE.Object3D(); ta.position.set(-5.6, 5.8, 0); G.add(ta);
+  s4.title = addLabel(ta, '', { cls:'stat', sceneIdx:4 });
+  regApply('pq_ets', true);
+})();
+function regSetBar(i, h){
+  var bar = s4.bars[i];
+  bar.scale.y = Math.max(0.05, Math.abs(h));
+  bar.position.y = h / 2;
+  s4.valAnchors[i].position.y = h + (h >= 0 ? 0.55 : -0.6);
+}
+function regApply(mk, instant){
+  s4.current = mk;
+  var mod = REGRESSION_MODELS[mk];
+  s4.title.el.innerHTML = '<span class="num">R² aj. ' + mod.r2.toFixed(3).replace('0.', '.') +
+    '</span><span class="cap">' + mod.label + ' (' + mod.sub + ') · n = ' + mod.n + '</span>';
+  var targets = [];
+  for (var i = 0; i < REG_PREDICTOR_ORDER.length; i++){
+    var pk = REG_PREDICTOR_ORDER[i];
+    var cf = mod.coef[pk];
+    targets.push(cf.beta * s4.SCALE);
+    var bar = s4.bars[i];
+    var col = cf.sig ? (cf.beta > 0 ? COL.pos : COL.neg) : COL.ns;
+    bar.material.color.setHex(col);
+    bar.material.emissive.setHex(col);
+    bar.material.emissiveIntensity = cf.sig ? 0.22 : 0.05;
+    bar.material.opacity = cf.sig ? 0.95 : 0.35;
+    bar.userData.tooltip = '<b>' + REG_PRED_LABEL[pk] + '</b><br>β = ' + fmt(cf.beta, 3) +
+      ' · p ' + fmtP(cf.p) + '<br><span class="tt-dim">' + mod.label +
+      (cf.sig ? '' : ' · no significativo') + '</span>';
+    s4.valLabels[i].el.innerHTML = (cf.sig ? '' : '<span style="opacity:.45">') +
+      fmt(cf.beta, 2).replace('0.', '.').replace('−0.', '−.') + (cf.sig ? '' : '</span>');
+  }
+  if (instant){
+    for (var j = 0; j < targets.length; j++) regSetBar(j, targets[j]);
+    s4.anim = null;
+  } else {
+    var from = s4.bars.map(function(b){ return b.position.y * 2; });
+    s4.anim = { t0:performance.now(), dur:650, from:from, to:targets };
+  }
+}
+SCENE_TICK[4] = function(t){
+  if (!s4.anim) return;
+  var k = Math.min(1, (t - s4.anim.t0) / s4.anim.dur);
+  var e = easeInOutCubic(k);
+  for (var i = 0; i < s4.bars.length; i++){
+    regSetBar(i, s4.anim.from[i] + (s4.anim.to[i] - s4.anim.from[i]) * e);
+  }
+  if (k >= 1) s4.anim = null;
+};
+function regDetailHTML(mk){
+  var mod = REGRESSION_MODELS[mk];
+  var h = '<h3>' + mod.label + '</h3>' +
+    '<div class="sub">' + mod.sub + ' · EE robustos HC3 · n = ' + mod.n +
+    ' · R² aj. = ' + mod.r2.toFixed(3).replace('0.', '.') + '</div>' +
+    '<table><tr><th>predictor</th><th style="text-align:right">β</th><th style="text-align:right">p</th></tr>';
+  for (var i = 0; i < REG_PREDICTOR_ORDER.length; i++){
+    var pk = REG_PREDICTOR_ORDER[i];
+    var cf = mod.coef[pk];
+    var cls = cf.sig ? (cf.beta < 0 ? 'v neg' : 'v') : 'v ns';
+    h += '<tr><td>' + REG_PRED_LABEL[pk] + '</td><td class="' + cls + '">' + fmt(cf.beta, 3) +
+         '</td><td class="v' + (cf.sig ? '' : ' ns') + '">' + fmtP(cf.p).replace('= ', '') + '</td></tr>';
+  }
+  h += '</table><p style="font-size:10.5px;color:var(--text-faint)">β estandarizados; los diez predictores son comunes a los cuatro modelos. Barras hacia arriba: β &gt; 0; hacia abajo: β &lt; 0; atenuadas: p ≥ .05.</p>';
+  return h;
+}
+function regSelect(mk){
+  regApply(mk, false);
+  markChipActive(mk);
+  showDetail(regDetailHTML(mk));
+}
+SCENE_CLICK[4] = function(obj){
+  if (obj){ showDetail(regDetailHTML(s4.current)); }
+  else { hideDetail(); }
+};
+SCENE_RESET[4] = function(){ markChipActive(s4.current); };
+
+
+/* suelo marciano bajo el laboratorio de regresión */
+(function(){
+  var G = sceneGroups[4];
+  G.add(makeTerrain({ colorA:[172,88,54], colorB:[92,42,28], craters:9, amp:1.9, y:-6.7, seed:21 }));
+  var dust = buildParticleField(150, 30, 0xa06a4a, 0.05, 0.22, 0.35);
+  dust.position.y = -3.5;
+  G.add(dust);
+})();
+
+/* ===================== ESCENA 5 — MODELO DE MEDIACIÓN (SEM) =====================
+   Código de color consistente: COBRE = camino que empeora el desenlace
+   (los tres b, que parten del afrontamiento pasivo); AZUL = camino
+   protector (a₁ y los efectos directos c′ del apoyo social).
+   Clic en cada actor ilumina solo su parte de la historia.               */
+var s5 = { outcomes:{}, paths:{}, pathLabels:{}, flows:[], selected:null };
+function estTxt(v){
+  var s = v.toFixed(3);
+  return s.replace('-0.', '−.').replace('0.', '.').replace('-', '−');
+}
+(function(){
+  var G = sceneGroups[5];
+  var posMOS = new THREE.Vector3(-6.4, 0.5, 0);
+  var posMED = new THREE.Vector3(0, 2.6, 0);
+  var posOut = {
+    pq_ets:new THREE.Vector3(6.4, 3.4, 0),
+    pq_burnout:new THREE.Vector3(6.4, 0.4, 0),
+    ryff_total:new THREE.Vector3(6.4, -2.6, 0)
+  };
+  var mos = makeSphere(0.55, COL.node, { glow:0.3 });
+  mos.position.copy(posMOS);
+  mos.userData = { type:'sem-mos',
+    tooltip:'<b>Apoyo social (MOS)</b><br><span class="tt-dim">variable exógena · clic: sus efectos directos y totales</span>' };
+  G.add(mos);
+  interactives[5].push(mos);
+  s5.mos = mos;
+  addLabel(mos, 'Apoyo social (MOS)', { cls:'dim', sceneIdx:5, offsetY:30 });
+
+  var med = makeSphere(0.45, COL.nodeBright, { glow:0.3 });
+  med.position.copy(posMED);
+  med.userData = { type:'sem-med',
+    tooltip:'<b>Afrontamiento pasivo</b><br><span class="tt-dim">mediador · clic: su papel en el modelo</span>' };
+  G.add(med);
+  interactives[5].push(med);
+  s5.med = med;
+  addLabel(med, 'Afrontamiento pasivo (mediador)', { cls:'dim', sceneIdx:5, offsetY:-26 });
+
+  var a1mid = new THREE.Vector3(-3.4, 2.4, 0.8);
+  var a1 = makeCurveTube([posMOS, a1mid, posMED], 0.045, COL.pos, 0.55);
+  G.add(a1);
+  s5.a1 = a1;
+  var a1anch = new THREE.Object3D();
+  a1anch.position.copy(a1mid).add(new THREE.Vector3(0, 0.5, 0));
+  G.add(a1anch);
+  s5.a1Label = addLabel(a1anch, 'a₁ = −.207 · protege', { cls:'dim', sceneIdx:5 });
+
+  for (var i = 0; i < SEM_OUTCOME_ORDER.length; i++){
+    var key = SEM_OUTCOME_ORDER[i];
+    var oc = SEM_DATA.outcomes[key];
+    var po = posOut[key];
+    var node = makeSphere(0.5, COL.neutral, { glow:0.26 });
+    node.position.copy(po);
+    node.userData = { type:'sem', key:key,
+      tooltip:'<b>' + oc.label + '</b><br><span class="tt-dim">R² = ' +
+        oc.r2.toFixed(3).replace('0.', '.') + ' · clic para aislar sus dos caminos</span>' };
+    G.add(node);
+    interactives[5].push(node);
+    s5.outcomes[key] = node;
+    addLabel(node, oc.label, { cls:'dim', sceneIdx:5, offsetY:-28 });
+
+    /* b: siempre cobre — el afrontamiento pasivo empeora los tres desenlaces */
+    var bmid = new THREE.Vector3(3.1, (posMED.y + po.y) / 2 + 0.7, 0.6);
+    var bt = makeCurveTube([posMED, bmid, po], 0.02 + Math.abs(oc.b.est) * 0.06, COL.neg, 0.45);
+    G.add(bt);
+    /* c′: siempre azul — el efecto directo del apoyo protege los tres */
+    var cmid = new THREE.Vector3(0.2, (posMOS.y + po.y) / 2 - 1.3, -1.6);
+    var ct = makeCurveTube([posMOS, cmid, po], 0.02 + Math.abs(oc.c.est) * 0.06, COL.pos, 0.45);
+    G.add(ct);
+    s5.paths[key] = { b:bt, c:ct };
+
+    var ba = new THREE.Object3D();
+    ba.position.copy(bmid).add(new THREE.Vector3(0, 0.45, 0));
+    G.add(ba);
+    var ca = new THREE.Object3D();
+    ca.position.copy(cmid).add(new THREE.Vector3(0, -0.55, 0));
+    G.add(ca);
+    s5.pathLabels[key] = {
+      b:addLabel(ba, 'b = ' + estTxt(oc.b.est) + ' · empeora', { cls:'dim', sceneIdx:5 }),
+      c:addLabel(ca, 'c′ = ' + estTxt(oc.c.est) + ' · protege', { cls:'dim', sceneIdx:5 })
+    };
+  }
+})();
+/* foco narrativo: qué caminos y etiquetas se iluminan según el actor elegido */
+function semApplyFocus(mode, key){
+  for (var k in s5.paths){
+    var bOn = (mode === 'outcome' && k === key) || (mode === 'med');
+    var cOn = (mode === 'outcome' && k === key) || (mode === 'mos');
+    s5.paths[k].b.material.opacity = (mode === 'all') ? 0.45 : (bOn ? 0.88 : 0.06);
+    s5.paths[k].c.material.opacity = (mode === 'all') ? 0.45 : (cOn ? 0.88 : 0.06);
+    s5.pathLabels[k].b.visible = bOn && mode !== 'all';
+    s5.pathLabels[k].c.visible = cOn && mode !== 'all';
+    s5.outcomes[k].material.opacity = (mode === 'outcome' && k !== key) ? 0.28 : 1;
+  }
+  var a1On = true;
+  s5.a1.material.opacity = (mode === 'all') ? 0.55 : (mode === 'mos' || mode === 'med' || mode === 'outcome') ? 0.9 : 0.55;
+  s5.a1Label.visible = (mode !== 'all') && a1On;
+  if (mode === 'all'){
+    for (var k2 in s5.pathLabels){
+      s5.pathLabels[k2].b.visible = true;
+      s5.pathLabels[k2].c.visible = true;
+    }
+    s5.a1Label.visible = true;
+  }
+}
+function semDetailHTML(key){
+  var oc = SEM_DATA.outcomes[key];
+  function row(name, e){
+    var cls = e.est < 0 ? 'v neg' : 'v';
+    return '<tr><td>' + name + '</td><td class="' + cls + '">' + fmt(e.est, 3) +
+      '</td><td class="v" style="color:var(--text-faint)">[' + fmt(e.ci[0], 3) + ', ' + fmt(e.ci[1], 3) +
+      ']</td><td class="v' + (e.p < 0.05 ? '' : ' ns') + '">' + fmtP(e.p).replace('= ', '') + '</td></tr>';
+  }
+  var h = '<h3>' + oc.label + '</h3>' +
+    '<div class="sub">mediación · bootstrap 2000 · IC 95% BCa · R² = ' +
+    oc.r2.toFixed(3).replace('0.', '.') + '</div>' +
+    '<table><tr><th>sendero</th><th style="text-align:right">est.</th><th style="text-align:right">IC 95%</th><th style="text-align:right">p</th></tr>' +
+    row('a₁ · MOS → afr. pasivo', SEM_DATA.a1) +
+    row('b · afr. pasivo → desenlace', oc.b) +
+    row("c' · efecto directo MOS", oc.c) +
+    row('indirecto (a₁×b)', oc.ind) +
+    row('total (c\' + a₁×b)', oc.tot) +
+    '</table><p style="font-size:10.5px;color:var(--text-faint)">El IC bootstrap del efecto indirecto excluye el cero: la mediación por afrontamiento pasivo es estadísticamente distinguible. Ajustado por edad, género y experiencia.</p>';
+  return h;
+}
+function semSpawnFlows(curves){
+  semClearFlows();
+  var G = sceneGroups[5];
+  for (var c = 0; c < curves.length; c++){
+    for (var i = 0; i < 9; i++){
+      var dot = makeSphere(0.055, 0xd9e6f2, { glow:0.6 });
+      dot.material.opacity = 0.75;
+      G.add(dot);
+      s5.flows.push({ mesh:dot, curve:curves[c], t:i / 9, speed:0.0022 + Math.random() * 0.001 });
+    }
+  }
+}
+function semClearFlows(){
+  for (var i = 0; i < s5.flows.length; i++){
+    sceneGroups[5].remove(s5.flows[i].mesh);
+    s5.flows[i].mesh.geometry.dispose();
+    s5.flows[i].mesh.material.dispose();
+  }
+  s5.flows = [];
+}
+/* clic en un DESENLACE: se aíslan sus dos caminos (indirecto y directo) */
+function semSelect(key){
+  s5.selected = key;
+  setAccent(s5.outcomes[key]);
+  markChipActive(key);
+  semApplyFocus('outcome', key);
+  semSpawnFlows([s5.a1.userData.curve, s5.paths[key].b.userData.curve, s5.paths[key].c.userData.curve]);
+  showDetail(semDetailHTML(key));
+}
+/* clic en el MEDIADOR: a₁ + los tres b — el canal por donde viaja el daño */
+function semSelectMed(){
+  s5.selected = 'med';
+  setAccent(s5.med);
+  markChipActive(null);
+  semApplyFocus('med', null);
+  var curves = [s5.a1.userData.curve];
+  for (var k in s5.paths) curves.push(s5.paths[k].b.userData.curve);
+  semSpawnFlows(curves);
+  showDetail(semMediatorHTML());
+}
+/* clic en MOS: a₁ + los tres c′ — las dos vías por las que protege */
+function semSelectMos(){
+  s5.selected = 'mos';
+  setAccent(s5.mos);
+  markChipActive(null);
+  semApplyFocus('mos', null);
+  var curves = [s5.a1.userData.curve];
+  for (var k in s5.paths) curves.push(s5.paths[k].c.userData.curve);
+  semSpawnFlows(curves);
+  showDetail(semMosHTML());
+}
+function semMediatorHTML(){
+  var h = '<h3>Afrontamiento pasivo</h3>' +
+    '<div class="sub">mediador · R² = ' + SEM_DATA.r2_mediator.toFixed(3).replace('0.', '.') + '</div>' +
+    '<p>Es el canal indirecto del modelo: recibe el efecto del apoyo social ' +
+    '(<span class="fig">a₁ = −.207</span>) y lo transmite <strong>empeorando</strong> los tres desenlaces.</p>' +
+    '<table><tr><th>sendero b</th><th style="text-align:right">est.</th><th style="text-align:right">IC 95%</th></tr>';
+  for (var i = 0; i < SEM_OUTCOME_ORDER.length; i++){
+    var k = SEM_OUTCOME_ORDER[i];
+    var oc = SEM_DATA.outcomes[k];
+    var cls = oc.b.est < 0 ? 'v neg' : 'v';
+    h += '<tr><td>→ ' + oc.label + '</td><td class="' + cls + '">' + fmt(oc.b.est, 3) +
+         '</td><td class="v" style="color:var(--text-faint)">[' + fmt(oc.b.ci[0], 3) + ', ' + fmt(oc.b.ci[1], 3) + ']</td></tr>';
+  }
+  h += '</table><p style="font-size:10.5px;color:var(--text-faint)">Por esta vía pasan los tres efectos ' +
+    'indirectos del apoyo (a₁×b): −.098 (ETS), −.061 (burnout) y +.074 (bienestar); ' +
+    'sus IC bootstrap excluyen el cero.</p>';
+  return h;
+}
+function semMosHTML(){
+  var h = '<h3>Apoyo social (MOS)</h3>' +
+    '<div class="sub">variable exógena · protege por dos vías</div>' +
+    '<p>Vía 1 — <strong>directa</strong> (c′, azul): su efecto sobre cada desenlace sin pasar por el mediador. ' +
+    'Vía 2 — <strong>indirecta</strong>: reduce el afrontamiento pasivo (a₁ = −.207) y con ello el daño de éste.</p>' +
+    '<table><tr><th>desenlace</th><th style="text-align:right">c′ directo</th><th style="text-align:right">total</th></tr>';
+  for (var i = 0; i < SEM_OUTCOME_ORDER.length; i++){
+    var k = SEM_OUTCOME_ORDER[i];
+    var oc = SEM_DATA.outcomes[k];
+    var clsC = oc.c.est < 0 ? 'v neg' : 'v';
+    var clsT = oc.tot.est < 0 ? 'v neg' : 'v';
+    h += '<tr><td>' + oc.label + '</td><td class="' + clsC + '">' + fmt(oc.c.est, 3) +
+         '</td><td class="' + clsT + '">' + fmt(oc.tot.est, 3) + '</td></tr>';
+  }
+  h += '</table><p style="font-size:10.5px;color:var(--text-faint)">El total (c′ + a₁×b) es la suma de las ' +
+    'dos vías. Todos los IC bootstrap 95% BCa excluyen el cero. Selecciona un desenlace para ver ' +
+    'su descomposición completa.</p>';
+  return h;
+}
+function semReset(){
+  s5.selected = null;
+  markChipActive(null);
+  semClearFlows();
+  semApplyFocus('all', null);
+}
+SCENE_CLICK[5] = function(obj){
+  if (obj && obj.userData.type === 'sem'){ semSelect(obj.userData.key); }
+  else if (obj && obj.userData.type === 'sem-med'){ semSelectMed(); }
+  else if (obj && obj.userData.type === 'sem-mos'){ semSelectMos(); }
+  else if (!obj){ hideDetail(); }
+};
+SCENE_RESET[5] = semReset;
+SCENE_LEAVE[5] = semClearFlows;
+SCENE_TICK[5] = function(t){
+  for (var i = 0; i < s5.flows.length; i++){
+    var f = s5.flows[i];
+    f.t += f.speed;
+    if (f.t > 1) f.t -= 1;
+    var p = f.curve.getPointAt(f.t);
+    f.mesh.position.copy(p);
+  }
+};
+
+
+/* suelo helado (Europa) bajo el modelo de mediación */
+(function(){
+  sceneGroups[5].add(makeTerrain({ colorA:[178,198,216], colorB:[104,128,154],
+    cracks:16, amp:0.9, y:-4.0, seed:31 }));
+})();
+
+/* ===================== ESCENA 6 — SÍNTESIS DE HIPÓTESIS =====================
+   Cuatro puertas cerradas sobre suelo planetario: cada una guarda el
+   veredicto de una hipótesis; el clic abre su evidencia.                  */
+var s6 = { slabs:{} };
+(function(){
+  var G = sceneGroups[6];
+  G.add(makeTerrain({ colorA:[96,80,108], colorB:[42,34,52], amp:1.1, flatR:13, y:-1.1, seed:41 }));
+
+  for (var i = 0; i < HYPOTHESIS_DATA.length; i++){
+    var hy = HYPOTHESIS_DATA[i];
+    var ang = (i - 1.5) * 0.30;
+    var x = Math.sin(ang) * 13.5;
+    var z = 4.5 - Math.cos(ang) * 4.5;
+    var slab = new THREE.Group();
+    slab.position.set(x, 1.05, z);
+    slab.rotation.y = -ang;
+    G.add(slab);
+
+    var col = hy.kind === 'ok' ? COL.ok : (hy.kind === 'partial' ? COL.partial : COL.nosup);
+
+    /* marco de piedra */
+    var frame = makeBox(3.5, 4.4, 0.24, 0x3a4150, { glow:0.04, opacity:1 });
+    slab.add(frame);
+    /* hoja de la puerta (interactiva) */
+    var door = makeBox(2.9, 4.02, 0.16, 0x141c29, { glow:0.05, opacity:1 });
+    door.position.z = 0.08;
+    door.userData = { type:'hyp', idx:i,
+      tooltip:'<b>' + hy.num + ' · ' + hy.verdict + '</b><br><span class="tt-dim">puerta cerrada · clic para abrir la evidencia</span>' };
+    slab.add(door);
+    interactives[6].push(door);
+    s6.slabs[hy.id] = door;
+
+    /* cuarterones rehundidos y tirador: lectura inmediata de "puerta" */
+    var q1 = makeBox(2.1, 1.35, 0.05, 0x0e141d, { glow:0.02, opacity:1 });
+    q1.position.set(0, 1.0, 0.17);
+    slab.add(q1);
+    var q2 = makeBox(2.1, 1.35, 0.05, 0x0e141d, { glow:0.02, opacity:1 });
+    q2.position.set(0, -0.75, 0.17);
+    slab.add(q2);
+    var knob = new THREE.Mesh(
+      new THREE.SphereGeometry(0.085, 16, 12),
+      new THREE.MeshPhongMaterial({ color:0x9aa4b5, shininess:70 })
+    );
+    knob.position.set(1.14, -0.05, 0.2);
+    slab.add(knob);
+
+    /* luz que se filtra bajo la puerta, del color del veredicto */
+    var seep = makeBox(2.9, 0.07, 0.06, col, { glow:0.6, opacity:0.75 });
+    seep.position.set(0, -2.03, 0.14);
+    slab.add(seep);
+
+    /* barra de veredicto sobre el dintel */
+    var track = makeBox(2.6, 0.14, 0.08, 0x25384f, { glow:0.03, opacity:0.9 });
+    track.position.set(0, -1.62, 0.19);
+    slab.add(track);
+    var fillW = 2.6 * hy.fill;
+    var fill = makeBox(fillW, 0.14, 0.08, col, { glow:0.3, opacity:1 });
+    fill.position.set(-(2.6 - fillW) / 2, -1.62, 0.2);
+    slab.add(fill);
+
+    var anNum = new THREE.Object3D(); anNum.position.set(0, 1.55, 0.4); slab.add(anNum);
+    addStatLabel(anNum, hy.num, hy.verdict, 6);
+    var anTx = new THREE.Object3D(); anTx.position.set(0, -0.15, 0.4); slab.add(anTx);
+    var wrapped = hy.text.length > 92 ? hy.text.slice(0, 90).replace(/\s\S*$/, '') + '…' : hy.text;
+    addLabel(anTx, '<span style="white-space:normal;display:block;width:200px;text-align:center;line-height:1.5">' +
+      wrapped + '</span>', { cls:'dim', sceneIdx:6 });
+  }
+})();
+function hypDetailHTML(i){
+  var hy = HYPOTHESIS_DATA[i];
+  var col = hy.kind === 'ok' ? 'var(--blue-bright)' : (hy.kind === 'partial' ? 'var(--partial)' : 'var(--nosup)');
+  return '<h3>' + hy.num + ' — ' + hy.verdict + '</h3>' +
+    '<div class="sub" style="color:' + col + '">contraste de hipótesis</div>' +
+    '<p><strong style="color:var(--text)">' + hy.text + '</strong></p>' +
+    '<p>' + hy.evidence + '</p>';
+}
+SCENE_CLICK[6] = function(obj){
+  if (obj && obj.userData.type === 'hyp'){
+    setAccent(obj);
+    showDetail(hypDetailHTML(obj.userData.idx));
+  } else { hideDetail(); }
+};
+
+/* ============================ PANELES NARRATIVOS ============================ */
+PANEL_HTML[0] =
+  '<div class="kicker">01 · Apertura</div>' +
+  '<h2>Un sistema de siete miradas sobre el mismo cuidado</h2>' +
+  '<p><strong>220 profesionales</strong> de la Unidad de Búsqueda de Personas dadas por Desaparecidas ' +
+  '(UBPD, Colombia) respondieron <strong>siete instrumentos</strong> que orbitan, como un sistema solar, ' +
+  'una misma pregunta: cómo está el bienestar emocional y psicológico de quienes buscan.</p>' +
+  '<p>El recorrido avanza del perfil del grupo a la validación psicométrica de cada instrumento ' +
+  '(AFC con WLSMV e invarianza de medida), las asociaciones bivariadas, cuatro modelos de regresión ' +
+  'y un modelo de mediación, hasta el contraste final de las cuatro hipótesis.</p>' +
+  '<div class="note">Toda cifra en esta pieza es agregada y anónima. Navega con las flechas ' +
+  '← →, el riel izquierdo o las teclas 1–7.</div>';
+PANEL_HTML[1] =
+  '<div class="kicker">02 · Perfil sociodemográfico</div>' +
+  '<h2>Quiénes integran el estudio</h2>' +
+  '<p>Edad media de <span class="mono">39.3</span> años (DE <span class="mono">8.4</span>; rango ' +
+  '<span class="mono">22–66</span>). Por género: <span class="mono">139</span> mujeres, ' +
+  '<span class="mono">78</span> hombres, <span class="mono">3</span> personas no binarias y ' +
+  '<span class="mono">1</span> persona que prefirió no responder.</p>' +
+  '<p>Las placas del fondo muestran la condición de <strong>víctima del conflicto</strong>: ' +
+  '<span class="mono">59–64</span> profesionales se reconocen como víctimas y ' +
+  '<span class="mono">147–155</span> no.</p>' +
+  '<div class="note">Los rangos corresponden a casos completos por instrumento (análisis de ' +
+  'invarianza); el plan no reporta totales globales de víctima ni de nivel. El nivel ' +
+  'central/territorial aparece en cada sala de la galería. Pasa el cursor por las barras para ' +
+  'ver cada n.</div>';
+PANEL_HTML[2] =
+  '<div class="kicker">03 · Galería de instrumentos</div>' +
+  '<h2>Siete salas, siete estructuras factoriales</h2>' +
+  '<p>Cada cúmulo es un instrumento validado mediante <strong>análisis factorial confirmatorio ' +
+  '(WLSMV)</strong>: sus satélites son los factores retenidos y su tamaño refleja la fiabilidad ' +
+  'ω de McDonald (de <span class="mono">.545</span> a <span class="mono">.975</span>).</p>' +
+  '<p>Selecciona una sala —con un clic o con las fichas inferiores— para ver índices de ajuste, ' +
+  'fiabilidad por factor e invarianza de medida por género y nivel.</p>' +
+  '<div class="note">La invarianza (ΔCFI ≤ .01) respalda comparar puntuaciones entre grupos. ' +
+  'En IES-R la secuencia central/territorial no fue estimable.</div>';
+PANEL_HTML[3] =
+  '<div class="kicker">04 · Correlaciones</div>' +
+  '<h2>Galaxias que protegen, meteoritos que exponen</h2>' +
+  '<p>Cada <strong>galaxia espiral</strong> es un factor de protección; cada ' +
+  '<strong>meteorito</strong>, un factor de riesgo o exposición. Los siete desenlaces ' +
+  'psicológicos permanecen ocultos hasta que eliges un factor.</p>' +
+  '<p>Al hacer clic emergen los desenlaces y solo las correlaciones de Spearman significativas ' +
+  'de ese factor (corrección de Holm; <span class="mono">46</span> de <span class="mono">70</span> ' +
+  'en total). Azul: asociación positiva; cobre: negativa; el grosor refleja la magnitud.</p>' +
+  '<div class="note">Las más fuertes: afrontamiento pasivo ↔ estrés traumático secundario ' +
+  '(<span class="mono">ρ = .55</span>) y satisfacción por compasión ↔ cinismo ' +
+  '(<span class="mono">ρ = −.58</span>). Clic en el vacío para replegar los desenlaces.</div>';
+PANEL_HTML[4] =
+  '<div class="kicker">05 · Regresión múltiple</div>' +
+  '<h2>Cuatro desenlaces, los mismos diez predictores</h2>' +
+  '<p>Modelos con β estandarizados y errores robustos HC3. El patrón es consistente: el ' +
+  '<strong>afrontamiento pasivo</strong> eleva el estrés traumático secundario ' +
+  '(<span class="mono">β = .43</span>) y reduce el bienestar (<span class="mono">β = −.39</span>); ' +
+  'el <strong>apoyo social</strong> protege en los cuatro modelos.</p>' +
+  '<p>Varianza explicada (R² ajustado): de <span class="mono">.255</span> (impacto de evento) a ' +
+  '<span class="mono">.410</span> (estrés traumático secundario).</p>' +
+  '<div class="note">Se muestra un desenlace a la vez: cámbialo con las fichas inferiores y ' +
+  'observa cómo se reacomodan las barras. Hacia arriba: β positivo; hacia abajo: negativo; ' +
+  'atenuadas: no significativas (p ≥ .05). Clic en una barra abre la tabla completa.</div>';
+PANEL_HTML[5] =
+  '<div class="kicker">06 · Modelo de mediación</div>' +
+  '<h2>El camino del apoyo social</h2>' +
+  '<p>El apoyo social reduce el afrontamiento pasivo (<span class="mono">a₁ = −.207</span>) y, a ' +
+  'través de él, alcanza indirectamente los tres desenlaces —además de su efecto directo. ' +
+  'Ajuste del modelo: <span class="mono">χ²(1) = 0.161, p = .688 · CFI = 1.000 · ' +
+  'RMSEA = .000 · SRMR = .005</span> (n = 189).</p>' +
+  '<p>Selecciona un desenlace para ver sus efectos directo, indirecto y total con intervalos ' +
+  'bootstrap (2000 repeticiones, IC 95% BCa).</p>' +
+  '<div class="note"><strong>Cobre</strong>: caminos que empeoran el desenlace — los tres parten del ' +
+  'afrontamiento pasivo. <strong>Azul</strong>: caminos que protegen — a₁ y los efectos directos del ' +
+  'apoyo social. Clic en un desenlace aísla sus dos caminos; clic en el mediador o en MOS ilumina ' +
+  'el papel de cada uno.</div>';
+PANEL_HTML[6] =
+  '<div class="kicker">07 · Cierre</div>' +
+  '<h2>Lo que el estudio sostiene</h2>' +
+  '<p>De las cuatro hipótesis: <strong>una apoyada</strong> (los estilos de afrontamiento influyen ' +
+  'en el bienestar), <strong>dos apoyadas parcialmente</strong> (protección del apoyo social con ' +
+  'APGAR desplazado por MOS; exposición prolongada asociada a ETS y burnout) y <strong>una no ' +
+  'apoyada</strong> (sin moderación por edad ni experiencia).</p>' +
+  '<p>El conjunto dibuja una conclusión sobria: en quienes buscan a las personas dadas por ' +
+  'desaparecidas, el apoyo social funcional y la forma de afrontar —más que la edad o los ' +
+  'años acumulados— marcan la diferencia en su bienestar.</p>' +
+  '<div class="note">Cada puerta cerrada guarda el veredicto de una hipótesis; la luz que se filtra por debajo anticipa su color. Clic para abrir la evidencia.</div>';
+
+/* ============================ CHIPS POR ESCENA ============================ */
+CHIP_CONFIG[2] = {
+  items: INSTRUMENT_ORDER.map(function(k){ return { key:k, label:INSTRUMENT_DETAIL[k].label }; }),
+  initial:null,
+  onSelect:function(k){ galleryFocus(k); }
+};
+CHIP_CONFIG[4] = {
+  items: REG_MODEL_ORDER.map(function(k){ return { key:k, label:REGRESSION_MODELS[k].label }; }),
+  initial:'pq_ets',
+  onSelect:function(k){ regSelect(k); }
+};
+CHIP_CONFIG[5] = {
+  items: SEM_OUTCOME_ORDER.map(function(k){ return { key:k, label:SEM_DATA.outcomes[k].label }; }),
+  initial:null,
+  onSelect:function(k){ semSelect(k); }
+};
+
+/* ============================ ARRANQUE Y BUCLE ============================ */
+buildRail();
+setPanel(PANEL_HTML[0]);
+updateRail();
+
+orbit.r = 30; orbit.phi = 1.15; orbit.theta = -0.6;
+orbit.target.set(0, 0.7, 0);
+applyOrbit();
+
+document.getElementById('start-btn').addEventListener('click', function(){
+  document.getElementById('intro').classList.add('gone');
+  tweenCameraTo(orbitStateForScene(0), 2400, null);
+});
+
+var lastHover = null;
+function updateHover(){
+  if (transitionActive || dragging){ hideTooltip(); renderer.domElement.style.cursor = 'default'; return; }
+  var obj = pickInteractive();
+  renderer.domElement.style.cursor = obj ? 'pointer' : 'default';
+  if (obj && obj.userData.tooltip){
+    showTooltip(obj.userData.tooltip, mousePX, mousePY);
+  } else {
+    hideTooltip();
+  }
+  lastHover = obj;
+}
+
+function animate(){
+  requestAnimationFrame(animate);
+  var t = performance.now();
+  stepCamTween();
+  if (!camTween && !transitionActive){
+    var idleFor = t - userInteractedAt;
+    var drift = currentScene === 0 ? 0.00042 : (idleFor > 4500 ? 0.00010 : 0);
+    orbit.theta += drift;
+  }
+  var tick = SCENE_TICK[currentScene];
+  if (tick) tick(t);
+  applyOrbit();
+  updateHover();
+  updateLabels();
+  renderer.render(scene, camera);
+}
+animate();
+
+</script>
+</body>
+</html>
